@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: sentinelx-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.backend
+    plan: free
+    region: oregon
+    envVars:
+      - key: PORT
+        value: "8888"
+      - key: ENVIRONMENT
+        value: "production"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      - key: ANALYST_PASSWORD
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: "https://frontend-sigma-liart-89.vercel.app,http://localhost:3000"
+      - key: DATABASE_URL
+        sync: false
