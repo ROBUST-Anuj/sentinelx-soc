@@ -25,20 +25,22 @@ async def lifespan(app: FastAPI):
         admin = res.scalars().first()
         if not admin:
             logger.info("Seeding default Administrator account (admin)...")
+            initial_admin_pw = os.getenv("ADMIN_PASSWORD", "Admin@SentinelX2026")
             new_admin = User(
                 username="admin",
                 email="admin@sentinelx.local",
-                hashed_password=get_password_hash("Admin@SentinelX2026"),
+                hashed_password=get_password_hash(initial_admin_pw),
                 role="admin",
                 is_active=True
             )
             session.add(new_admin)
             
             # Also seed demo analyst
+            initial_analyst_pw = os.getenv("ANALYST_PASSWORD", "Analyst@SentinelX2026")
             analyst = User(
                 username="analyst",
                 email="analyst@sentinelx.local",
-                hashed_password=get_password_hash("Analyst@SentinelX2026"),
+                hashed_password=get_password_hash(initial_analyst_pw),
                 role="analyst",
                 is_active=True
             )
@@ -54,12 +56,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS
+# CORS configuration
+cors_origins = settings.CORS_ORIGINS if settings.ENVIRONMENT == "production" else ["*"]
+allow_creds = True if settings.ENVIRONMENT != "production" or "*" not in cors_origins else False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=cors_origins,
+    allow_credentials=allow_creds,
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

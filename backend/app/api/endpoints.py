@@ -75,7 +75,8 @@ async def get_soc_stats(db: AsyncSession = Depends(get_db), current_user: User =
     events_res = await db.execute(select(Event))
     events = events_res.scalars().all()
     
-    incidents_res = await db.execute(select(Incident))
+    from sqlalchemy.orm import selectinload
+    incidents_res = await db.execute(select(Incident).options(selectinload(Incident.findings)))
     incidents = incidents_res.scalars().all()
     
     findings_res = await db.execute(select(DetectionFinding))
@@ -230,14 +231,32 @@ async def get_events(
     events = res.scalars().all()
     return events
 
-# ----------------- INCIDENTS API -----------------
 @api_router.get("/incidents")
 async def get_incidents(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    res = await db.execute(select(Incident).order_by(Incident.created_at.desc()))
-    return res.scalars().all()
+    from sqlalchemy.orm import selectinload
+    res = await db.execute(select(Incident).options(selectinload(Incident.findings)).order_by(Incident.created_at.desc()))
+    incidents = res.scalars().all()
+    return [
+        {
+            "id": inc.id,
+            "title": inc.title,
+            "summary": inc.summary,
+            "status": inc.status,
+            "severity": inc.severity,
+            "assigned_to": inc.assigned_to,
+            "first_seen": inc.first_seen.isoformat() if inc.first_seen else None,
+            "last_seen": inc.last_seen.isoformat() if inc.last_seen else None,
+            "affected_entities": inc.affected_entities or [],
+            "threat_intel_matches": inc.threat_intel_matches or [],
+            "graph_risk_score": inc.graph_risk_score,
+            "findings_count": len(inc.findings) if inc.findings else 0,
+            "created_at": inc.created_at.isoformat() if inc.created_at else None
+        }
+        for inc in incidents
+    ]
 
 @api_router.get("/incidents/{incident_id}")
 async def get_incident_detail(
@@ -341,11 +360,20 @@ async def execute_response(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.ANALYST]))
 ):
+    # In public/production deployment, strictly force simulation to prevent destructive live actions
+    effective_dry_run = True if settings.ENVIRONMENT == "production" else req.dry_run
+
+    if not effective_dry_run and current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Live defense execution requires Administrator authorization."
+        )
+
     execution = response_engine.execute_action(
         action_type=req.action_type,
         target=req.target,
         executed_by=current_user.username,
-        dry_run=req.dry_run,
+        dry_run=effective_dry_run,
         incident_id=req.incident_id,
         approved_by=current_user.username if current_user.role == "admin" else None
     )
@@ -362,6 +390,7 @@ async def execute_response(
         approved_by=current_user.username if current_user.role == "admin" else None,
         executed_at=datetime.utcnow()
     )
+    db.add(db_exec)
     # Fetch last audit log entry for hash chaining
     last_audit_res = await db.execute(select(AuditLog).order_by(AuditLog.timestamp.desc()))
     last_audit = last_audit_res.scalars().first()

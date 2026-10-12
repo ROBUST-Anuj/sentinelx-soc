@@ -1,0 +1,71 @@
+# Git Ignore Configuration for SentinelX SOC
+
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Node & Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.npm
+.eslintcache
+*.tsbuildinfo
+
+# Database Files & SQLite
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+data/sentinelx.db
+data/uploads/*
+!data/uploads/.gitkeep
+data/samples/*
+!data/samples/.gitkeep
+
+# Environment & Secrets (NEVER COMMIT)
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.cert
+
+# Operating System & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+.docker/
