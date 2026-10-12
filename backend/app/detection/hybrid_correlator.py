@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Tuple
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models.schemas import CanonicalEvent, SeverityLevel, IncidentStatus
 from app.detection.rule_engine import rule_engine, RuleResult
 from app.detection.ml_engine import ml_detector
@@ -19,13 +19,6 @@ class HybridCorrelator:
         self,
         events: List[CanonicalEvent]
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """
-        Runs Rule Engine, ML Detector, Threat Intel matcher, then correlates everything
-        into unified security incidents with evidence chains.
-        
-        Returns:
-            (all_findings, correlated_incidents, ti_matches)
-        """
         all_findings: List[Dict[str, Any]] = []
 
         # 1. Detector A: Rule-Based Detection
@@ -42,14 +35,14 @@ class HybridCorrelator:
                 "affected_entity": r.affected_entity,
                 "confidence": r.confidence,
                 "metadata": r.metadata,
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat()
             })
 
         # 2. Detector B: Machine Learning Detection
         ml_results = ml_detector.predict_events(events)
         for m in ml_results:
             m["id"] = str(uuid.uuid4())
-            m["created_at"] = datetime.utcnow().isoformat()
+            m["created_at"] = datetime.now(timezone.utc).isoformat()
             if hasattr(m["severity"], "value"):
                 m["severity"] = m["severity"].value
             all_findings.append(m)
@@ -57,7 +50,6 @@ class HybridCorrelator:
         # 3. Threat Intelligence Matching
         ti_matches = threat_intel.match_events(events)
         for match in ti_matches:
-            # Threat intelligence matches generate high-fidelity findings
             all_findings.append({
                 "id": str(uuid.uuid4()),
                 "detector_type": "threat_intel",
@@ -69,7 +61,7 @@ class HybridCorrelator:
                 "affected_entity": match["indicator_value"],
                 "confidence": match["confidence"],
                 "metadata": match,
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat()
             })
 
         # 4. Hybrid Graph-Aware Entity Clustering into Incidents
@@ -83,17 +75,11 @@ class HybridCorrelator:
         events: List[CanonicalEvent],
         ti_matches: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """
-        Groups findings sharing common affected entities (User, Host, IP) or intersecting evidence events
-        into coherent multi-stage attack incidents.
-        """
         if not findings:
             return []
 
-        # Build lookup for event timestamps
         event_time_map = {e.event_id: e.timestamp for e in events}
 
-        # Cluster by entity
         entity_to_findings = defaultdict(list)
         for f in findings:
             ent = f.get("affected_entity") or "unattributed_entity"
@@ -108,18 +94,15 @@ class HybridCorrelator:
                 f["incident_id"] = inc_id
 
             timestamps = [event_time_map[eid] for eid in all_evidence_ids if eid in event_time_map]
-            first_seen = min(timestamps) if timestamps else datetime.utcnow()
-            last_seen = max(timestamps) if timestamps else datetime.utcnow()
+            first_seen = min(timestamps) if timestamps else datetime.now(timezone.utc)
+            last_seen = max(timestamps) if timestamps else datetime.now(timezone.utc)
 
-            # Determine composite severity
             has_crit = any(f["severity"] == "critical" for f in f_list)
             has_high = any(f["severity"] == "high" for f in f_list)
             inc_severity = "critical" if has_crit else ("high" if (has_high or len(f_list) > 2) else "medium")
 
-            # Check matching TI indicators
             matched_iocs = [m["indicator_value"] for m in ti_matches if m.get("indicator_value") == entity or m.get("event_id") in all_evidence_ids]
 
-            # Generate synthesis summary
             rule_count = sum(1 for f in f_list if f["detector_type"] == "rule")
             ml_count = sum(1 for f in f_list if f["detector_type"] == "ml")
             ti_count = sum(1 for f in f_list if f["detector_type"] == "threat_intel")
@@ -144,7 +127,7 @@ class HybridCorrelator:
                 "threat_intel_matches": list(set(matched_iocs)),
                 "graph_risk_score": min(9.9, round(2.0 + (len(f_list) * 1.5) + (3.0 if inc_severity == 'critical' else 1.0), 2)),
                 "findings": f_list,
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat()
             })
 
         return incidents

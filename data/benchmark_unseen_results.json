@@ -1,0 +1,41 @@
+{
+  "Rule_Unseen": {
+    "precision": 1.0,
+    "recall": 0.7,
+    "f1_score": 0.8235,
+    "fpr": 0.0,
+    "fnr": 0.3,
+    "confusion_matrix": {
+      "tn": 150,
+      "fp": 0,
+      "fn": 15,
+      "tp": 35
+    }
+  },
+  "ML_Unseen": {
+    "precision": 0.25,
+    "recall": 1.0,
+    "f1_score": 0.4,
+    "fpr": 1.0,
+    "fnr": 0.0,
+    "confusion_matrix": {
+      "tn": 0,
+      "fp": 150,
+      "fn": 0,
+      "tp": 50
+    }
+  },
+  "Hybrid_Unseen": {
+    "precision": 0.25,
+    "recall": 1.0,
+    "f1_score": 0.4,
+    "fpr": 1.0,
+    "fnr": 0.0,
+    "confusion_matrix": {
+      "tn": 0,
+      "fp": 150,
+      "fn": 0,
+      "tp": 50
+    }
+  }
+}

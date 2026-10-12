@@ -4,12 +4,12 @@ from app.detection.rule_engine import rule_engine
 from app.detection.ml_engine import ml_detector
 from app.threat_intel.manager import threat_intel
 from app.detection.hybrid_correlator import hybrid_correlator
-from datetime import datetime
+from datetime import datetime, timezone
 
 def test_rule_engine_brute_force():
     events = [
         CanonicalEvent(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             source_type=SourceType.LINUX_AUTH,
             source_name="auth",
             src_ip="185.220.101.5",
@@ -25,7 +25,7 @@ def test_rule_engine_brute_force():
 def test_threat_intel_match():
     events = [
         CanonicalEvent(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             source_type=SourceType.LINUX_AUTH,
             source_name="auth",
             src_ip="185.220.101.5",
@@ -39,7 +39,7 @@ def test_threat_intel_match():
 def test_ml_detection_inference():
     events = [
         CanonicalEvent(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             source_type=SourceType.SYSMON,
             source_name="sysmon",
             event_type="process_creation",
@@ -53,7 +53,7 @@ def test_ml_detection_inference():
 def test_hybrid_correlation_clusters():
     events = [
         CanonicalEvent(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             source_type=SourceType.LINUX_AUTH,
             source_name="auth",
             src_ip="185.220.101.5",
