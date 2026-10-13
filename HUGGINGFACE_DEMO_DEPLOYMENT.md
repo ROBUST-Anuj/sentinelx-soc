@@ -104,12 +104,13 @@ git remote add space https://huggingface.co/spaces/YOUR_HF_USERNAME/sentinelx-so
 git push -u space main --force
 ```
 
-### Step 4: Verification
-Once files are uploaded, Hugging Face will instantly build and serve the page at:
-```
-https://huggingface.co/spaces/YOUR_HF_USERNAME/sentinelx-soc-demo
-```
-The application will render immediately within the Space iframe and can also be opened full-screen.
+### Step 4: Live Verification Results
+
+The Space is **active, verified, and running**:
+- **Hugging Face Space URL:** [https://huggingface.co/spaces/Anuj1555/sentinelx-soc-demo](https://huggingface.co/spaces/Anuj1555/sentinelx-soc-demo)
+- **Direct Fullscreen Web URL:** [https://anuj1555-sentinelx-soc-demo.static.hf.space](https://anuj1555-sentinelx-soc-demo.static.hf.space)
+- **Verified HTTP Status:** `200 OK` across main page, CSS stylesheets, and compiled JavaScript bundles.
+- **Operating Cost:** **\$0.00 / month forever** (No compute, no card, no database).
 
 ---
 
