@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { Shield, Lock, User, Key, AlertCircle, ArrowRight } from 'lucide-react';
 
+import { isDemoMode } from '../services/api';
+
 interface LoginPageProps {
   onLoginSuccess: (user: { username: string; role: string }) => void;
   onLoginApi: (username: string, pass: string) => Promise<{ access_token: string; role: string; username: string }>;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onLoginApi }) => {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('Admin@SentinelX2026');
+  const [username, setUsername] = useState(isDemoMode ? 'demo_admin' : 'admin');
+  const [password, setPassword] = useState(isDemoMode ? 'demo_passphrase' : 'Admin@SentinelX2026');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,39 +136,73 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onLoginApi
             </button>
           </form>
 
-          {/* Seed presets for demo (enabled locally or when VITE_DEMO_PRESETS is true) */}
-          {(import.meta.env.DEV || import.meta.env.VITE_DEMO_PRESETS === 'true') && (
+          {/* Seed presets for demo */}
+          {isDemoMode ? (
+            <div className="mt-6 pt-5 border-t border-[var(--border-subtle)]">
+              <span className="block text-[11px] font-semibold uppercase tracking-wider text-amber-400 mb-2.5">
+                Interactive Demonstration Profiles
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSeedSelect('demo_admin', 'demo_passphrase')}
+                  className="p-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] hover:border-cyan-500/50 text-left transition-colors group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-200 group-hover:text-cyan-400">demo_admin</span>
+                    <span className="text-[10px] text-cyan-400/90 font-mono bg-cyan-950/60 px-1 rounded">RBAC Admin</span>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)] block mt-0.5">Simulated Admin</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSeedSelect('demo_analyst', 'demo_passphrase')}
+                  className="p-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] hover:border-cyan-500/50 text-left transition-colors group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-200 group-hover:text-cyan-400">demo_analyst</span>
+                    <span className="text-[10px] text-amber-400/90 font-mono bg-amber-950/60 px-1 rounded">SOC Analyst</span>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)] block mt-0.5">Simulated Analyst</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-amber-300/80 mt-2 text-center">
+                Click any profile above and authenticate without contacting any live database.
+              </p>
+            </div>
+          ) : (import.meta.env.DEV || import.meta.env.VITE_DEMO_PRESETS === 'true') && (
             <div className="mt-6 pt-5 border-t border-[var(--border-subtle)]">
               <span className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-2.5">
                 Rapid Demonstration Presets
               </span>
               <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleSeedSelect('admin', 'Admin@SentinelX2026')}
-                className="p-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] hover:border-cyan-500/50 text-left transition-colors group"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-200 group-hover:text-cyan-400">admin</span>
-                  <span className="text-[10px] text-cyan-400/90 font-mono bg-cyan-950/60 px-1 rounded">RBAC Full</span>
-                </div>
-                <span className="text-[10px] text-[var(--text-muted)] block mt-0.5">Admin@SentinelX2026</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => handleSeedSelect('admin', 'Admin@SentinelX2026')}
+                  className="p-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] hover:border-cyan-500/50 text-left transition-colors group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-200 group-hover:text-cyan-400">admin</span>
+                    <span className="text-[10px] text-cyan-400/90 font-mono bg-cyan-950/60 px-1 rounded">RBAC Full</span>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)] block mt-0.5">Admin@SentinelX2026</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => handleSeedSelect('analyst', 'Analyst@SentinelX2026')}
-                className="p-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] hover:border-cyan-500/50 text-left transition-colors group"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-200 group-hover:text-cyan-400">analyst</span>
-                  <span className="text-[10px] text-amber-400/90 font-mono bg-amber-950/60 px-1 rounded">SOC Read</span>
-                </div>
-                <span className="text-[10px] text-[var(--text-muted)] block mt-0.5">Analyst@SentinelX2026</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => handleSeedSelect('analyst', 'Analyst@SentinelX2026')}
+                  className="p-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] hover:border-cyan-500/50 text-left transition-colors group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-200 group-hover:text-cyan-400">analyst</span>
+                    <span className="text-[10px] text-amber-400/90 font-mono bg-amber-950/60 px-1 rounded">SOC Read</span>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)] block mt-0.5">Analyst@SentinelX2026</span>
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
 
         {/* Academic and compliance footer */}

@@ -5,6 +5,10 @@ import type {
   AttackGraphData, BenchmarkReport, ThreatIndicator, ResponseExecution 
 } from '../types/soc';
 
+import { demoStorage } from './demoAdapter';
+
+export const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+
 export function getApiBaseUrl(): string {
   // If production environment variable is defined (e.g. on Vercel deployment)
   const envApiUrl = import.meta.env.VITE_API_BASE_URL;
@@ -57,6 +61,12 @@ class ApiService {
   }
 
   public async login(username: string, password: string): Promise<{ access_token: string; role: string; username: string }> {
+    if (isDemoMode) {
+      const role = username.toLowerCase().includes('analyst') ? 'analyst' : 'admin';
+      const token = `demo_token_${Date.now()}`;
+      this.setToken(token);
+      return { access_token: token, role, username: username || 'demo_operator' };
+    }
     const formData = new FormData();
     formData.append('username', username);
     formData.append('password', password);
@@ -70,11 +80,13 @@ class ApiService {
   }
 
   public async getStats(): Promise<SOCStats> {
+    if (isDemoMode) return demoStorage.getStats();
     const res = await this.client.get('/overview/stats');
     return res.data;
   }
 
   public async getEvents(limit: number = 50, offset: number = 0, sourceType?: string): Promise<CanonicalEvent[]> {
+    if (isDemoMode) return demoStorage.getEvents(limit, offset, sourceType);
     const params: any = { limit, offset };
     if (sourceType) params.source_type = sourceType;
     const res = await this.client.get('/events', { params });
@@ -82,51 +94,61 @@ class ApiService {
   }
 
   public async getIncidents(): Promise<Incident[]> {
+    if (isDemoMode) return demoStorage.getIncidents();
     const res = await this.client.get('/incidents');
     return res.data;
   }
 
   public async getIncidentDetail(id: string): Promise<{ incident: Incident; findings: DetectionFinding[]; evidence_events: CanonicalEvent[] }> {
+    if (isDemoMode) return demoStorage.getIncidentDetail(id);
     const res = await this.client.get(`/incidents/${id}`);
     return res.data;
   }
 
   public async updateIncidentStatus(id: string, status: string): Promise<{ status: string; new_status: string }> {
+    if (isDemoMode) return demoStorage.updateIncidentStatus(id, status);
     const res = await this.client.patch(`/incidents/${id}/status?status=${status}`);
     return res.data;
   }
 
   public async getAttackGraph(incidentId: string): Promise<AttackGraphData> {
+    if (isDemoMode) return demoStorage.getAttackGraph(incidentId);
     const res = await this.client.get(`/graph/incident/${incidentId}`);
     return res.data;
   }
 
   public async runBenchmark(nEvents: number = 1000): Promise<BenchmarkReport> {
+    if (isDemoMode) return demoStorage.runBenchmark(nEvents);
     const res = await this.client.post(`/evaluation/run-benchmark?n_events=${nEvents}`);
     return res.data;
   }
 
   public async getThreatIndicators(): Promise<ThreatIndicator[]> {
+    if (isDemoMode) return demoStorage.getThreatIndicators();
     const res = await this.client.get('/threat-intel');
     return res.data;
   }
 
   public async addThreatIndicator(indicator: ThreatIndicator): Promise<any> {
+    if (isDemoMode) return demoStorage.addThreatIndicator(indicator);
     const res = await this.client.post('/threat-intel', indicator);
     return res.data;
   }
 
   public async executeResponse(payload: { action_type: string; target: string; dry_run: boolean; incident_id?: string }): Promise<any> {
+    if (isDemoMode) return demoStorage.executeResponse(payload);
     const res = await this.client.post('/response/execute', payload);
     return res.data;
   }
 
   public async getResponseHistory(): Promise<ResponseExecution[]> {
+    if (isDemoMode) return demoStorage.getResponseHistory();
     const res = await this.client.get('/response/history');
     return res.data;
   }
 
   public async uploadTelemetry(sourceType: string, sourceName: string, file: File): Promise<any> {
+    if (isDemoMode) return demoStorage.uploadTelemetry(sourceType, sourceName, file);
     const formData = new FormData();
     formData.append('source_type', sourceType);
     formData.append('source_name', sourceName);

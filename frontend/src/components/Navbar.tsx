@@ -1,6 +1,8 @@
 import React from 'react';
 import { RefreshCw } from 'lucide-react';
 
+import { isDemoMode } from '../services/api';
+
 interface NavbarProps {
   title: string;
   subtitle: string;
@@ -37,27 +39,50 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        {/* System Health Status Indicator */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '6px 12px',
-          backgroundColor: '#0f1d2e',
-          borderRadius: '20px',
-          border: '1px solid #1e3a5f'
-        }}>
-          <span style={{
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            backgroundColor: '#10b981',
-            boxShadow: '0 0 8px #10b981'
-          }} />
-          <span style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 500 }}>
-            API Core Active
-          </span>
-        </div>
+        {/* System Health / Demo Status Indicator */}
+        {isDemoMode ? (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '6px 12px',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+            borderRadius: '20px',
+            border: '1px solid rgba(245, 158, 11, 0.3)'
+          }}>
+            <span style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: '#f59e0b',
+              boxShadow: '0 0 8px #f59e0b'
+            }} />
+            <span style={{ fontSize: '12px', color: '#fbbf24', fontWeight: 600 }}>
+              Interactive Demo Mode (Sample Telemetry)
+            </span>
+          </div>
+        ) : (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '6px 12px',
+            backgroundColor: '#0f1d2e',
+            borderRadius: '20px',
+            border: '1px solid #1e3a5f'
+          }}>
+            <span style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: '#10b981',
+              boxShadow: '0 0 8px #10b981'
+            }} />
+            <span style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 500 }}>
+              API Core Active
+            </span>
+          </div>
+        )}
 
         {/* Refresh Action Button */}
         {onRefresh && (
