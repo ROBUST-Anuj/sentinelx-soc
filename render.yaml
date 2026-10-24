@@ -5,9 +5,10 @@ services:
     dockerfilePath: ./Dockerfile.backend
     plan: free
     region: oregon
+    healthCheckPath: /health
     envVars:
       - key: PORT
-        value: "8888"
+        value: "8000"
       - key: ENVIRONMENT
         value: "production"
       - key: SECRET_KEY
