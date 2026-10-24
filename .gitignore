@@ -69,3 +69,6 @@ Thumbs.db
 
 # Docker
 .docker/
+
+# Deployment & Demo Artifacts
+deploy/

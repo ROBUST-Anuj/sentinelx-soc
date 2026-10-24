@@ -4,10 +4,12 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.database import async_engine, Base, AsyncSessionLocal
 from app.core.security import get_password_hash
-from app.models.db_models import User
+from app.models.db_models import User, BankAccount
 from app.api.endpoints import api_router
+from app.banking.routes import banking_router
 from sqlalchemy.future import select
 import logging
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("sentinelx")
@@ -46,6 +48,49 @@ async def lifespan(app: FastAPI):
             )
             session.add(analyst)
             await session.commit()
+
+        # Seed synthetic bank accounts for demo users if none exist
+        admin_acc_stmt = select(BankAccount).where(BankAccount.account_number == "ACT-SYNTH-1001")
+        admin_acc_res = await session.execute(admin_acc_stmt)
+        if not admin_acc_res.scalars().first():
+            # Get admin and analyst users
+            admin_user = (await session.execute(select(User).where(User.username == "admin"))).scalars().first()
+            analyst_user = (await session.execute(select(User).where(User.username == "analyst"))).scalars().first()
+            if admin_user:
+                acc_admin = BankAccount(
+                    user_id=admin_user.id,
+                    account_number="ACT-SYNTH-1001",
+                    account_type="checking",
+                    currency="INR",
+                    balance_minor=1_000_000_00,  # ₹10,00,000.00
+                    status="active",
+                    is_synthetic=True
+                )
+                session.add(acc_admin)
+            if analyst_user:
+                acc_analyst = BankAccount(
+                    user_id=analyst_user.id,
+                    account_number="ACT-SYNTH-2002",
+                    account_type="savings",
+                    currency="INR",
+                    balance_minor=250_000_00,  # ₹2,50,000.00
+                    status="active",
+                    is_synthetic=True
+                )
+                session.add(acc_analyst)
+                # Add a suspicious / restricted beneficiary account for security scenario testing
+                acc_suspicious = BankAccount(
+                    user_id=analyst_user.id,
+                    account_number="ACT-SYNTH-9999",
+                    account_type="merchant",
+                    currency="INR",
+                    balance_minor=50_000_00,
+                    status="suspended",  # administrative lock
+                    is_synthetic=True
+                )
+                session.add(acc_suspicious)
+            await session.commit()
+            logger.info("Seeded initial synthetic bank accounts (ACT-SYNTH-1001, ACT-SYNTH-2002, ACT-SYNTH-9999).")
     yield
     # Shutdown
     logger.info("Shutting down SentinelX application services...")
@@ -68,8 +113,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include Router
+# Include Routers
 app.include_router(api_router, prefix=settings.API_V1_STR)
+app.include_router(banking_router, prefix=settings.API_V1_STR)
 
 @app.get("/health")
 def health_check():

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Text, ForeignKey, JSON
+from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Text, ForeignKey, JSON, CheckConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -174,3 +174,108 @@ class AuditLog(Base):
     def calculate_entry_hash(prev_hash: str | None, user_id: str, action: str, resource_type: str, resource_id: str | None, timestamp: datetime) -> str:
         payload = f"{prev_hash or 'GENESIS'}|{user_id}|{action}|{resource_type}|{resource_id or ''}|{timestamp.isoformat()}"
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+# ========================================================
+# BANKING SIMULATION & TRANSACTION GATEWAY DOMAIN MODELS
+# ========================================================
+
+class BankAccount(Base):
+    __tablename__ = "bank_accounts"
+    __table_args__ = (CheckConstraint("balance_minor >= 0", name="ck_bank_account_balance_positive"),)
+    
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    account_number = Column(String, unique=True, index=True, nullable=False)
+    account_type = Column(String, default="savings")  # savings, checking, merchant
+    currency = Column(String, default="INR")  # INR, USD, EUR
+    balance_minor = Column(Integer, default=0)  # balance in integer minor units (e.g. paise / cents)
+    status = Column(String, default="active")  # active, frozen, suspended, closed
+    is_synthetic = Column(Boolean, default=True)  # explicit synthetic indicator
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    user = relationship("User")
+    debit_entries = relationship("LedgerEntry", foreign_keys="LedgerEntry.account_id", back_populates="account")
+
+class LedgerEntry(Base):
+    """
+    Immutable double-entry balance bookkeeping record.
+    Every completed transfer generates exactly one DEBIT and one CREDIT entry.
+    """
+    __tablename__ = "ledger_entries"
+    
+    id = Column(String, primary_key=True, default=generate_uuid)
+    transaction_id = Column(String, ForeignKey("transfers.id", ondelete="CASCADE"), nullable=False, index=True)
+    account_id = Column(String, ForeignKey("bank_accounts.id", ondelete="RESTRICT"), nullable=False, index=True)
+    entry_type = Column(String, nullable=False)  # DEBIT, CREDIT
+    amount_minor = Column(Integer, nullable=False)  # always positive integer
+    currency = Column(String, default="INR")
+    balance_after_minor = Column(Integer, nullable=False)
+    description = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    account = relationship("BankAccount", foreign_keys=[account_id], back_populates="debit_entries")
+    transfer = relationship("Transfer", back_populates="ledger_entries")
+
+class Transfer(Base):
+    __tablename__ = "transfers"
+    
+    id = Column(String, primary_key=True, default=generate_uuid)
+    idempotency_key = Column(String, unique=True, index=True, nullable=False)
+    source_account_id = Column(String, ForeignKey("bank_accounts.id", ondelete="RESTRICT"), nullable=False, index=True)
+    destination_account_id = Column(String, ForeignKey("bank_accounts.id", ondelete="RESTRICT"), nullable=False, index=True)
+    amount_minor = Column(Integer, nullable=False)  # integer minor units
+    currency = Column(String, default="INR")
+    description = Column(String, nullable=True)
+    status = Column(String, default="CREATED", index=True)  # CREATED, ASSESSING, AWAITING_VERIFICATION, HELD, APPROVED, POSTED, BLOCKED, REJECTED, EXPIRED, FAILED
+    policy_decision = Column(String, nullable=True)  # ALLOW, VERIFY, HOLD, BLOCK
+    risk_score = Column(Float, default=0.0)
+    risk_level = Column(String, default="LOW")  # LOW, MEDIUM, HIGH, CRITICAL
+    reason_codes = Column(JSON, default=list)
+    decision_explanation = Column(Text, nullable=True)
+    correlation_id = Column(String, index=True, nullable=False, default=generate_uuid)
+    initiated_by_user_id = Column(String, nullable=False)
+    incident_id = Column(String, ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    source_account = relationship("BankAccount", foreign_keys=[source_account_id])
+    destination_account = relationship("BankAccount", foreign_keys=[destination_account_id])
+    incident = relationship("Incident")
+    ledger_entries = relationship("LedgerEntry", back_populates="transfer", cascade="all, delete-orphan")
+    risk_assessment = relationship("RiskAssessment", back_populates="transfer", uselist=False, cascade="all, delete-orphan")
+    verification_challenge = relationship("VerificationChallenge", back_populates="transfer", uselist=False, cascade="all, delete-orphan")
+
+class RiskAssessment(Base):
+    __tablename__ = "risk_assessments"
+    
+    id = Column(String, primary_key=True, default=generate_uuid)
+    transfer_id = Column(String, ForeignKey("transfers.id", ondelete="CASCADE"), unique=True, nullable=False)
+    total_score = Column(Float, nullable=False)  # 0.0 to 100.0
+    risk_level = Column(String, nullable=False)  # LOW, MEDIUM, HIGH, CRITICAL
+    policy_decision = Column(String, nullable=False)  # ALLOW, VERIFY, HOLD, BLOCK
+    rule_findings = Column(JSON, default=list)
+    ml_novelty_score = Column(Float, nullable=True)
+    graph_risk_contribution = Column(Float, default=0.0)
+    reason_codes = Column(JSON, default=list)
+    explanation = Column(Text, nullable=False)
+    assessment_version = Column(String, default="v2.0-hybrid")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    transfer = relationship("Transfer", back_populates="risk_assessment")
+
+class VerificationChallenge(Base):
+    __tablename__ = "verification_challenges"
+    
+    id = Column(String, primary_key=True, default=generate_uuid)
+    transfer_id = Column(String, ForeignKey("transfers.id", ondelete="CASCADE"), unique=True, nullable=False)
+    challenge_type = Column(String, default="MOCK_OTP")  # MOCK_OTP, BIOMETRIC_SIM, STEP_UP_PIN
+    expected_code = Column(String, nullable=False)  # Mock verification code for demonstration
+    status = Column(String, default="PENDING")  # PENDING, VERIFIED, EXPIRED, FAILED
+    attempt_count = Column(Integer, default=0)
+    max_attempts = Column(Integer, default=3)
+    expires_at = Column(DateTime, nullable=False)
+    verified_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    transfer = relationship("Transfer", back_populates="verification_challenge")

@@ -2,7 +2,8 @@ import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import type { 
   SOCStats, Incident, CanonicalEvent, DetectionFinding, 
-  AttackGraphData, BenchmarkReport, ThreatIndicator, ResponseExecution 
+  AttackGraphData, BenchmarkReport, ThreatIndicator, ResponseExecution,
+  BankAccount, Transfer, TransferCreatePayload, VerificationSubmitPayload
 } from '../types/soc';
 
 export function getApiBaseUrl(): string {
@@ -133,6 +134,37 @@ class ApiService {
     formData.append('source_name', sourceName);
     formData.append('file', file);
     const res = await this.client.post('/ingestion/upload', formData);
+    return res.data;
+  }
+
+  public async getBankAccounts(): Promise<BankAccount[]> {
+    const res = await this.client.get('/banking/accounts');
+    return res.data;
+  }
+
+  public async getBankAccount(id: string): Promise<BankAccount> {
+    const res = await this.client.get('/banking/accounts/' + id);
+    return res.data;
+  }
+
+  public async createTransfer(payload: TransferCreatePayload): Promise<Transfer> {
+    const res = await this.client.post('/banking/transfers', payload);
+    return res.data;
+  }
+
+  public async verifyTransferChallenge(transferId: string, payload: VerificationSubmitPayload): Promise<Transfer> {
+    const res = await this.client.post('/banking/transfers/' + transferId + '/verify', payload);
+    return res.data;
+  }
+
+  public async getTransfers(accountId?: string): Promise<Transfer[]> {
+    const url = accountId ? '/banking/transfers?account_id=' + accountId : '/banking/transfers';
+    const res = await this.client.get(url);
+    return res.data;
+  }
+
+  public async getTransferDetail(id: string): Promise<Transfer> {
+    const res = await this.client.get('/banking/transfers/' + id);
     return res.data;
   }
 }

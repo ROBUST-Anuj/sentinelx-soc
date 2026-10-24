@@ -141,3 +141,82 @@ export interface ResponseExecution {
   created_at: string;
   result_details: Record<string, any>;
 }
+
+export type PolicyDecision = 'ALLOW' | 'VERIFY' | 'HOLD' | 'BLOCK';
+export type TransferStatus = 'CREATED' | 'ASSESSING' | 'AWAITING_VERIFICATION' | 'POSTED' | 'HELD' | 'BLOCKED';
+
+export interface BankAccount {
+  id: string;
+  user_id: string;
+  account_number: string;
+  currency: string;
+  balance_minor: number;
+  status: 'active' | 'frozen' | 'closed';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LedgerEntry {
+  id: string;
+  transfer_id: string;
+  account_id: string;
+  entry_type: 'DEBIT' | 'CREDIT';
+  amount_minor: number;
+  balance_after_minor: number;
+  currency: string;
+  created_at: string;
+}
+
+export interface VerificationChallenge {
+  id: string;
+  transfer_id: string;
+  challenge_type: string;
+  status: 'PENDING' | 'VERIFIED' | 'EXPIRED' | 'FAILED';
+  expires_at: string;
+  created_at: string;
+  expected_code?: string;
+}
+
+export interface RiskAssessment {
+  id: string;
+  transfer_id: string;
+  decision: PolicyDecision;
+  risk_score: number;
+  reason_codes: string[];
+  rules_triggered: string[];
+  created_at: string;
+}
+
+export interface Transfer {
+  id: string;
+  idempotency_key: string;
+  source_account_id: string;
+  destination_account_number: string;
+  amount_minor: number;
+  currency: string;
+  status: TransferStatus;
+  policy_decision: PolicyDecision;
+  risk_score: number;
+  reason_codes: string[];
+  requires_verification: boolean;
+  incident_id?: string | null;
+  mock_challenge_code?: string | null;
+  destination_account_id?: string;
+  created_at: string;
+  updated_at: string;
+  verification_challenge?: VerificationChallenge | null;
+  ledger_entries?: LedgerEntry[];
+}
+
+export interface TransferCreatePayload {
+  source_account_id: string;
+  destination_account_number: string;
+  amount_minor: number;
+  currency: string;
+  idempotency_key: string;
+}
+
+export interface VerificationSubmitPayload {
+  code: string;
+}
+

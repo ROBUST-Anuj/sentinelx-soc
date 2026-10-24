@@ -9,6 +9,7 @@ import { DetectionLabPage } from './pages/DetectionLabPage';
 import { TelemetryPage } from './pages/TelemetryPage';
 import { ThreatIntelPage } from './pages/ThreatIntelPage';
 import { ResponseCenterPage } from './pages/ResponseCenterPage';
+import { BankingPage } from './pages/BankingPage';
 import { api } from './services/api';
 
 export default function App() {
@@ -94,6 +95,11 @@ export default function App() {
           title: 'Incident Response & Guardrail Playbooks',
           subtitle: 'Controlled defensive actions equipped with allowlisting and cryptographic audit trails',
         };
+      case 'banking':
+        return {
+          title: 'Enterprise Banking Gateway & Ledger Simulation',
+          subtitle: 'Pre-transaction fraud risk evaluation, multi-tier policy enforcement, and atomic double-entry ledger posting',
+        };
       default:
         return {
           title: 'SentinelX SOC',
@@ -139,6 +145,7 @@ export default function App() {
             {activeTab === 'benchmark' && <DetectionLabPage />}
             {activeTab === 'threat_intel' && <ThreatIntelPage />}
             {activeTab === 'response' && <ResponseCenterPage />}
+            {activeTab === 'banking' && <BankingPage />}
           </div>
         </main>
       </div>

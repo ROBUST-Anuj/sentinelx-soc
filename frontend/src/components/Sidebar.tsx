@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   ShieldAlert, Activity, AlertTriangle, Terminal, Network, 
-  BarChart3, Crosshair, ShieldCheck, ChevronLeft, ChevronRight, LogOut, Radio
+  BarChart3, Crosshair, ShieldCheck, Landmark, ChevronLeft, ChevronRight, LogOut, Radio
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -31,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'benchmark', label: 'Detection Lab', icon: BarChart3, badge: 'Evaluation' },
     { id: 'threat_intel', label: 'Threat Intel (TI)', icon: Crosshair, badge: null },
     { id: 'response', label: 'Response Center', icon: ShieldCheck, badge: 'Safe' },
+    { id: 'banking', label: 'Banking Simulation', icon: Landmark, badge: 'Protected' },
   ];
 
   return (

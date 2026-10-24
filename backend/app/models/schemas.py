@@ -155,3 +155,94 @@ class ThreatIndicatorCreate(BaseModel):
     confidence: float = 0.8
     source: str = "local_feed"
     description: Optional[str] = None
+
+# ========================================================
+# BANKING SIMULATION & TRANSACTION GATEWAY SCHEMAS
+# ========================================================
+
+class PolicyDecision(str, Enum):
+    ALLOW = "ALLOW"
+    VERIFY = "VERIFY"
+    HOLD = "HOLD"
+    BLOCK = "BLOCK"
+
+class TransferStatus(str, Enum):
+    CREATED = "CREATED"
+    ASSESSING = "ASSESSING"
+    AWAITING_VERIFICATION = "AWAITING_VERIFICATION"
+    HELD = "HELD"
+    APPROVED = "APPROVED"
+    POSTED = "POSTED"
+    BLOCKED = "BLOCKED"
+    REJECTED = "REJECTED"
+    EXPIRED = "EXPIRED"
+    FAILED = "FAILED"
+
+class BankAccountResponse(BaseModel):
+    id: str
+    user_id: str
+    account_number: str
+    account_type: str
+    currency: str
+    balance_minor: int
+    balance_formatted: str
+    status: str
+    is_synthetic: bool
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class TransferCreateRequest(BaseModel):
+    source_account_id: str
+    destination_account_number: str
+    amount_minor: int = Field(gt=0, description="Transfer amount in integer minor units (paise/cents)")
+    currency: str = Field(default="INR", pattern="^(INR|USD|EUR)$")
+    description: Optional[str] = Field(default="Account transfer", max_length=255)
+    idempotency_key: str = Field(min_length=8, max_length=64, description="Unique client idempotency key")
+
+class VerificationSubmitRequest(BaseModel):
+    verification_code: str = Field(min_length=4, max_length=8)
+
+class RiskAssessmentResponse(BaseModel):
+    transfer_id: str
+    total_score: float
+    risk_level: str
+    policy_decision: PolicyDecision
+    reason_codes: List[str]
+    explanation: str
+    rule_findings: List[Dict[str, Any]]
+    assessment_version: str
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class TransferResponse(BaseModel):
+    id: str
+    idempotency_key: str
+    source_account_id: str
+    destination_account_id: str
+    amount_minor: int
+    amount_formatted: str
+    currency: str
+    status: TransferStatus
+    policy_decision: Optional[PolicyDecision] = None
+    risk_score: float
+    risk_level: str
+    reason_codes: List[str]
+    decision_explanation: Optional[str] = None
+    correlation_id: str
+    incident_id: Optional[str] = None
+    created_at: datetime
+    verification_challenge_id: Optional[str] = None
+    mock_challenge_code: Optional[str] = None  # Returned only for demonstration convenience in test/demo mode
+    model_config = ConfigDict(from_attributes=True)
+
+class LedgerEntryResponse(BaseModel):
+    id: str
+    transaction_id: str
+    account_id: str
+    entry_type: str
+    amount_minor: int
+    currency: str
+    balance_after_minor: int
+    description: Optional[str] = None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
