@@ -9,7 +9,8 @@ export function getApiBaseUrl(): string {
   // If production environment variable is defined (e.g. on Vercel deployment)
   const envApiUrl = import.meta.env.VITE_API_BASE_URL;
   if (envApiUrl && typeof envApiUrl === 'string' && envApiUrl.trim().length > 0) {
-    return envApiUrl.trim().replace(/\/$/, '');
+    const cleanUrl = envApiUrl.trim().replace(/\/$/, '');
+    return cleanUrl.endsWith('/api') ? cleanUrl : cleanUrl + '/api';
   }
 
   // If running locally in browser, dynamically connect to backend port 8888 (Docker) or 8000 (Local)
