@@ -5,7 +5,7 @@ import os
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "SentinelX SOC Platform"
-    VERSION: str = "2.1.0"
+    VERSION: str = "2.2.0"
     API_V1_STR: str = "/api"
     
     # Security

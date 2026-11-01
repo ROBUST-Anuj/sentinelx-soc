@@ -28,6 +28,28 @@ async def lifespan(app: FastAPI):
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         
+        # Non-destructive schema migration for PostgreSQL:
+        # Adds missing columns to existing tables without affecting existing data
+        from sqlalchemy import text
+        migration_statements = [
+            "ALTER TABLE threat_indicators ADD COLUMN IF NOT EXISTS first_seen TIMESTAMP DEFAULT NOW();",
+            "ALTER TABLE threat_indicators ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP DEFAULT NOW();",
+            "ALTER TABLE threat_indicators ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;",
+            "ALTER TABLE threat_indicators ADD COLUMN IF NOT EXISTS metadata_info JSON DEFAULT '{}';",
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS prev_hash VARCHAR;",
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entry_hash VARCHAR DEFAULT 'GENESIS';",
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS resource_type VARCHAR DEFAULT 'system';",
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS resource_id VARCHAR;",
+            "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS affected_entities JSON DEFAULT '[]';",
+            "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS threat_intel_matches JSON DEFAULT '[]';",
+            "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS graph_risk_score FLOAT DEFAULT 0.0;"
+        ]
+        for stmt in migration_statements:
+            try:
+                await conn.execute(text(stmt))
+            except Exception as e:
+                logger.debug(f"Schema migration statement notice: {e}")
+        
     async with AsyncSessionLocal() as session:
         # Check if default admin exists
         res = await session.execute(select(User).where(User.username == "admin"))
@@ -98,6 +120,25 @@ async def lifespan(app: FastAPI):
                 session.add(acc_suspicious)
             await session.commit()
             logger.info("Seeded initial synthetic bank accounts (ACT-SYNTH-1001, ACT-SYNTH-2002, ACT-SYNTH-9999).")
+
+        # Ensure restricted account ACT-SYNTH-9999 exists for fraud simulation scenarios
+        susp_stmt = select(BankAccount).where(BankAccount.account_number == "ACT-SYNTH-9999")
+        susp_res = await session.execute(susp_stmt)
+        if not susp_res.scalars().first():
+            admin_u = (await session.execute(select(User).where(User.username == "admin"))).scalars().first()
+            if admin_u:
+                acc_suspicious = BankAccount(
+                    user_id=admin_u.id,
+                    account_number="ACT-SYNTH-9999",
+                    account_type="merchant",
+                    currency="INR",
+                    balance_minor=50_000_00,
+                    status="suspended",
+                    is_synthetic=True
+                )
+                session.add(acc_suspicious)
+                await session.commit()
+                logger.info("Seeded restricted beneficiary account ACT-SYNTH-9999.")
     yield
     # Shutdown
     logger.info("Shutting down SentinelX application services...")
