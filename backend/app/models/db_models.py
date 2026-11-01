@@ -126,7 +126,7 @@ class ThreatIndicator(Base):
     __tablename__ = "threat_indicators"
     
     id = Column(String, primary_key=True, default=generate_uuid)
-    indicator_type = Column(String, index=True, nullable=False)  # ip, domain, hash
+    indicator_type = Column(String, index=True, nullable=False)  # ip, domain, hash, user_agent, device_fingerprint, restricted_beneficiary
     value = Column(String, index=True, nullable=False)
     threat_type = Column(String, nullable=False)
     severity = Column(String, default="high")
@@ -134,6 +134,10 @@ class ThreatIndicator(Base):
     source = Column(String, default="local_feed")
     description = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
+    first_seen = Column(DateTime, default=datetime.utcnow)
+    last_seen = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=True)
+    metadata_info = Column(JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class ResponseExecution(Base):
@@ -279,3 +283,54 @@ class VerificationChallenge(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     transfer = relationship("Transfer", back_populates="verification_challenge")
+
+class SecurityViolationEvent(Base):
+    __tablename__ = "security_violation_events"
+    
+    id = Column(String, primary_key=True, default=generate_uuid)
+    event_id = Column(String, unique=True, index=True, nullable=False)
+    event_type = Column(String, index=True, nullable=False)
+    category = Column(String, index=True, nullable=False)  # browser_behaviour, authentication, transaction_fraud, beneficiary_manipulation, network_anomaly, application_security
+    severity = Column(String, index=True, nullable=False)  # informational, low, medium, high, critical
+    timestamp = Column(DateTime, index=True, nullable=False, default=datetime.utcnow)
+    customer_id = Column(String, index=True, nullable=True)
+    session_id = Column(String, index=True, nullable=True)
+    transaction_id = Column(String, index=True, nullable=True)
+    source_ip = Column(String, index=True, nullable=True)
+    device_id = Column(String, nullable=True)
+    source_application = Column(String, default="NexaBank-Web")
+    event_metadata = Column(JSON, default=dict)
+    detection_rule = Column(String, nullable=False)
+    risk_contribution = Column(Float, default=0.0)
+    correlation_id = Column(String, index=True, nullable=False)
+    incident_id = Column(String, ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True)
+    is_simulation = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class ResponsePlaybookAction(Base):
+    __tablename__ = "response_playbook_actions"
+    
+    id = Column(String, primary_key=True, default=generate_uuid)
+    action_id = Column(String, unique=True, index=True, nullable=False)
+    incident_id = Column(String, ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
+    playbook_id = Column(String, index=True, nullable=False)
+    action_type = Column(String, index=True, nullable=False)  # REVOKE_SESSION, REQUIRE_STEP_UP_OTP, SUSPEND_PENDING_TRANSACTION, RESTRICT_BENEFICIARY, FLAG_ACCOUNT_INVESTIGATION, BLOCK_MALICIOUS_SOURCE, NOTIFY_CUSTOMER, ESCALATE_SENIOR_ANALYST
+    target_entity = Column(String, nullable=False)  # e.g., session_id, account_id, customer_id, ip
+    parameters = Column(JSON, default=dict)
+    risk_level = Column(String, default="Medium")  # Low, Medium, High, Critical
+    requires_approval = Column(Boolean, default=True)
+    status = Column(String, default="SUGGESTED", index=True)  # SUGGESTED, PENDING_APPROVAL, APPROVED, REJECTED, EXECUTING, EXECUTED, FAILED, ROLLED_BACK
+    requested_by = Column(String, default="SentinelX-Orchestrator")
+    approved_by = Column(String, nullable=True)
+    rejected_by = Column(String, nullable=True)
+    executed_by = Column(String, nullable=True)
+    execution_result = Column(JSON, default=dict)
+    error_details = Column(Text, nullable=True)
+    rollback_token = Column(String, nullable=True)
+    is_simulation = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    executed_at = Column(DateTime, nullable=True)
+
+    incident = relationship("Incident")
+
+

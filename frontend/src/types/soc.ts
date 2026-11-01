@@ -51,7 +51,7 @@ export interface CanonicalEvent {
 export interface AttackGraphNode {
   id: string;
   label: string;
-  type: 'incident' | 'event' | 'host' | 'user' | 'ip' | 'process' | 'finding';
+  type: string;
   severity: string;
   risk_score: number;
   metadata?: Record<string, any>;
@@ -61,6 +61,7 @@ export interface AttackGraphEdge {
   source: string;
   target: string;
   relation: string;
+  evidence?: string;
 }
 
 export interface AttackGraphData {
@@ -70,13 +71,77 @@ export interface AttackGraphData {
   edges: AttackGraphEdge[];
 }
 
+export interface SystemHealth {
+  api_status: string;
+  database_status: string;
+  database_engine: string;
+  ml_inference_status: string;
+  storyline_correlator: string;
+  containment_orchestrator: string;
+  uptime_seconds: number;
+}
+
+export interface TimelineItem {
+  id: string;
+  timestamp: string;
+  category: string;
+  title: string;
+  summary: string;
+  severity: string;
+  source_provenance: string;
+  entity_references: Record<string, any>;
+  payload: Record<string, any>;
+  is_delayed: boolean;
+  cryptographic_seal?: string | null;
+}
+
+export interface FullDemoLifecycleResult {
+  step_number: number;
+  step_name: string;
+  status: string;
+  details: Record<string, any>;
+}
+
+export interface FullDemoResponse {
+  execution_id: string;
+  incident_id: string;
+  customer_id: string;
+  session_id: string;
+  timestamp: string;
+  total_steps: number;
+  successful_steps: number;
+  steps: FullDemoLifecycleResult[];
+}
+
+export interface NavigationParams {
+  incidentId?: string;
+  customerId?: string;
+  sessionId?: string;
+  indicatorValue?: string;
+  storylineId?: string;
+  actionId?: string;
+  activeSubTab?: string;
+}
+
 export interface SOCStats {
   total_events: number;
+  total_security_events?: number;
+  raw_events_count?: number;
+  violations_count?: number;
+  active_critical_high_incidents?: number;
+  active_attack_storylines?: number;
+  threat_intelligence_matches?: number;
+  active_threat_indicators?: number;
+  pending_response_approvals?: number;
+  successful_containment_actions?: number;
+  failed_response_actions?: number;
   total_findings: number;
   total_incidents: number;
   active_sources: number;
   severity_distribution: Record<string, number>;
-  recent_incidents: Incident[];
+  recent_incidents: any[];
+  recent_incident_activity?: any[];
+  system_health?: SystemHealth;
 }
 
 export interface BenchmarkMetrics {
@@ -120,13 +185,17 @@ export interface BenchmarkReport {
 
 export interface ThreatIndicator {
   id?: string;
-  indicator_type: 'ip' | 'domain' | 'hash';
+  indicator_type: 'ip' | 'domain' | 'hash' | 'user_agent' | 'device_fingerprint' | 'restricted_beneficiary' | string;
   value: string;
   threat_type: string;
   severity: string;
   confidence: number;
   source: string;
   description?: string;
+  first_seen?: string;
+  last_seen?: string;
+  expires_at?: string;
+  metadata_info?: Record<string, any>;
 }
 
 export interface ResponseExecution {
@@ -219,4 +288,27 @@ export interface TransferCreatePayload {
 export interface VerificationSubmitPayload {
   code: string;
 }
+
+export interface SecurityViolationEvent {
+  id: string;
+  event_id: string;
+  event_type: string;
+  category: string;
+  severity: 'informational' | 'low' | 'medium' | 'high' | 'critical';
+  timestamp: string;
+  customer_id?: string;
+  session_id?: string;
+  transaction_id?: string;
+  source_ip?: string;
+  device_id?: string;
+  source_application: string;
+  event_metadata: Record<string, any>;
+  detection_rule: string;
+  risk_contribution: number;
+  correlation_id: string;
+  incident_id?: string;
+  is_simulation: boolean;
+  created_at: string;
+}
+
 

@@ -25,7 +25,10 @@ class Settings(BaseSettings):
     
     # Environment & CORS
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
-    CORS_ORIGINS: Union[List[str], str] = os.getenv("CORS_ORIGINS", ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1:3000"])
+    CORS_ORIGINS: Union[List[str], str] = os.getenv("CORS_ORIGINS", ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1:3000", "http://localhost:5174", "http://127.0.0.1:5174"])
+
+    # Internal Service-to-Service Security
+    INTERNAL_SERVICE_KEY: str = os.getenv("INTERNAL_SERVICE_KEY", "sentinelx-internal-banking-secret-key-2026")
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

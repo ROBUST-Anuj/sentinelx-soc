@@ -32,6 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'threat_intel', label: 'Threat Intel (TI)', icon: Crosshair, badge: null },
     { id: 'response', label: 'Response Center', icon: ShieldCheck, badge: 'Safe' },
     { id: 'banking', label: 'Banking Simulation', icon: Landmark, badge: 'Protected' },
+    { id: 'banking_monitor', label: 'Banking Security SOC', icon: ShieldAlert, badge: 'Realtime' },
   ];
 
   return (

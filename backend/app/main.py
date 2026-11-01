@@ -7,6 +7,13 @@ from app.core.security import get_password_hash
 from app.models.db_models import User, BankAccount
 from app.api.endpoints import api_router
 from app.banking.routes import banking_router
+from app.banking.internal_routes import internal_router
+from app.banking.telemetry_routes import telemetry_router
+from app.banking.storyline_routes import storyline_router
+from app.banking.orchestration_routes import orchestration_router
+from app.banking.enforcement_routes import enforcement_router
+from app.banking.intel_routes import intel_router
+from app.banking.command_center_routes import command_center_router
 from sqlalchemy.future import select
 import logging
 import os
@@ -116,6 +123,13 @@ app.add_middleware(
 # Include Routers
 app.include_router(api_router, prefix=settings.API_V1_STR)
 app.include_router(banking_router, prefix=settings.API_V1_STR)
+app.include_router(telemetry_router, prefix=settings.API_V1_STR)
+app.include_router(storyline_router, prefix=settings.API_V1_STR)
+app.include_router(orchestration_router, prefix=settings.API_V1_STR)
+app.include_router(intel_router, prefix=settings.API_V1_STR)
+app.include_router(command_center_router, prefix=settings.API_V1_STR)
+app.include_router(enforcement_router)
+app.include_router(internal_router)
 
 @app.get("/health")
 def health_check():

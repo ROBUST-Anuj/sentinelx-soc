@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Share2, Info, RefreshCw, ZoomIn, ZoomOut
+  Share2, Info, RefreshCw, ZoomIn, ZoomOut, ShieldAlert, ArrowRight
 } from 'lucide-react';
 import type { Incident, AttackGraphData, AttackGraphNode } from '../types/soc';
 import { api } from '../services/api';
 
-export const AttackGraphPage: React.FC = () => {
+interface AttackGraphPageProps {
+  initialIncidentId?: string;
+  onNavigateToTab?: (tab: string, params?: any) => void;
+}
+
+export const AttackGraphPage: React.FC<AttackGraphPageProps> = ({ initialIncidentId, onNavigateToTab }) => {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string>('');
   const [graphData, setGraphData] = useState<AttackGraphData | null>(null);
@@ -18,13 +23,23 @@ export const AttackGraphPage: React.FC = () => {
     loadIncidents();
   }, []);
 
+  useEffect(() => {
+    if (initialIncidentId && initialIncidentId !== selectedIncidentId) {
+      setSelectedIncidentId(initialIncidentId);
+      loadGraph(initialIncidentId);
+    }
+  }, [initialIncidentId]);
+
   const loadIncidents = async () => {
     try {
       const data = await api.getIncidents();
       setIncidents(data);
-      if (data.length > 0) {
-        setSelectedIncidentId(data[0].id);
-        loadGraph(data[0].id);
+      const targetId = initialIncidentId && data.some(d => d.id === initialIncidentId)
+        ? initialIncidentId
+        : (data.length > 0 ? data[0].id : '');
+      if (targetId) {
+        setSelectedIncidentId(targetId);
+        loadGraph(targetId);
       } else {
         setLoading(false);
       }
@@ -52,14 +67,14 @@ export const AttackGraphPage: React.FC = () => {
     loadGraph(id);
   };
 
-  // Compute node coordinates dynamically in an elliptical circular layout with central incident
+  // Compute node coordinates dynamically in an elliptical layout with central incident
   const getNodeCoordinates = (nodes: AttackGraphNode[], width: number = 800, height: number = 550) => {
     const coords: Record<string, { x: number; y: number }> = {};
     const centerX = width / 2;
     const centerY = height / 2;
 
-    const incidentNodes = nodes.filter((n) => n.type === 'incident');
-    const otherNodes = nodes.filter((n) => n.type !== 'incident');
+    const incidentNodes = nodes.filter((n) => n.type.toLowerCase() === 'incident');
+    const otherNodes = nodes.filter((n) => n.type.toLowerCase() !== 'incident');
 
     if (incidentNodes.length > 0) {
       coords[incidentNodes[0].id] = { x: centerX, y: centerY };
@@ -81,17 +96,32 @@ export const AttackGraphPage: React.FC = () => {
   };
 
   const getNodeColor = (type: string, severity: string) => {
-    switch (type) {
+    const t = type.toLowerCase();
+    switch (t) {
       case 'incident':
         return '#f43f5e'; // rose-500
       case 'finding':
+      case 'securityviolation':
         return severity === 'critical' ? '#ef4444' : '#f59e0b';
       case 'host':
-        return '#06b6d4'; // cyan-500
+      case 'device':
+        return '#6366f1'; // indigo-500
       case 'user':
+      case 'customer':
         return '#8b5cf6'; // purple-500
       case 'ip':
+      case 'ipaddress':
         return '#3b82f6'; // blue-500
+      case 'session':
+        return '#06b6d4'; // cyan-500
+      case 'transaction':
+        return '#eab308'; // yellow-500
+      case 'bankaccount':
+        return '#10b981'; // emerald-500
+      case 'threatindicator':
+        return '#ec4899'; // pink-500
+      case 'responseaction':
+        return '#14b8a6'; // teal-500
       case 'process':
         return '#10b981'; // emerald-500
       default:
@@ -99,8 +129,15 @@ export const AttackGraphPage: React.FC = () => {
     }
   };
 
+  const availableNodeTypes = [
+    'all',
+    ...Array.from(new Set((graphData?.nodes || []).map((n) => n.type))).filter(
+      (t) => t.toLowerCase() !== 'incident'
+    ),
+  ];
+
   const visibleNodes = (graphData?.nodes || []).filter(
-    (n) => filterNodeType === 'all' || n.type === filterNodeType || n.type === 'incident'
+    (n) => filterNodeType === 'all' || n.type === filterNodeType || n.type.toLowerCase() === 'incident'
   );
   const visibleNodeIds = new Set(visibleNodes.map((n) => n.id));
 
@@ -109,6 +146,11 @@ export const AttackGraphPage: React.FC = () => {
   );
 
   const coords = getNodeCoordinates(visibleNodes);
+
+  // Connected edges for selected node inspector
+  const connectedEdges = (graphData?.edges || []).filter(
+    (e) => selectedNode && (e.source === selectedNode.id || e.target === selectedNode.id)
+  );
 
   return (
     <div className="space-y-6">
@@ -120,7 +162,7 @@ export const AttackGraphPage: React.FC = () => {
             Attack-Graph Topological Reasoning Canvas
           </h2>
           <p className="text-xs text-[var(--text-muted)] mt-1">
-            NetworkX multi-hop entity relationship graph linking host telemetry, network endpoints, and IOC indicators
+            NetworkX multi-hop entity graph linking customer identities, network origins, banking accounts, threat indicators, and containment actions
           </p>
         </div>
 
@@ -130,7 +172,7 @@ export const AttackGraphPage: React.FC = () => {
             <select
               value={selectedIncidentId}
               onChange={(e) => handleIncidentChange(e.target.value)}
-              className="bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-xs text-cyan-300 font-mono rounded-lg px-3 py-1.5 focus:outline-none focus:border-cyan-500"
+              className="bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-xs text-cyan-300 font-mono rounded-lg px-3 py-1.5 focus:outline-none focus:border-cyan-500 max-w-[260px] truncate"
             >
               {incidents.map((inc) => (
                 <option key={inc.id} value={inc.id}>
@@ -156,10 +198,10 @@ export const AttackGraphPage: React.FC = () => {
         {/* Interactive Graph Area (3 Cols) */}
         <div className="lg:col-span-3 cyber-card p-4 flex flex-col relative min-h-[580px] overflow-hidden">
           {/* Canvas Toolbar overlay */}
-          <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)] z-10">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-slate-400">Filter Nodes:</span>
-              {['all', 'host', 'ip', 'user', 'process', 'finding'].map((t) => (
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)] z-10 flex-wrap gap-2">
+            <div className="flex items-center gap-1.5 text-xs flex-wrap">
+              <span className="text-slate-400 text-xs mr-1">Filter:</span>
+              {availableNodeTypes.map((t) => (
                 <button
                   key={t}
                   onClick={() => setFilterNodeType(t)}
@@ -200,12 +242,12 @@ export const AttackGraphPage: React.FC = () => {
             {loading ? (
               <div className="text-center text-slate-400">
                 <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                <p className="text-xs">Computing topological risk pathways...</p>
+                <p className="text-xs">Computing multi-hop topological graph...</p>
               </div>
             ) : !graphData || visibleNodes.length === 0 ? (
               <div className="text-center text-slate-500">
                 <Share2 className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">No topological data found for this incident</p>
+                <p className="text-sm">No topological entities found for this incident</p>
               </div>
             ) : (
               <div
@@ -228,7 +270,7 @@ export const AttackGraphPage: React.FC = () => {
                       markerHeight="6"
                       orient="auto-start-reverse"
                     >
-                      <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569" />
+                      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
                     </marker>
                   </defs>
 
@@ -241,6 +283,10 @@ export const AttackGraphPage: React.FC = () => {
                     const midX = (src.x + dst.x) / 2;
                     const midY = (src.y + dst.y) / 2;
 
+                    const isHighlight =
+                      selectedNode &&
+                      (edge.source === selectedNode.id || edge.target === selectedNode.id);
+
                     return (
                       <g key={idx}>
                         <line
@@ -248,18 +294,23 @@ export const AttackGraphPage: React.FC = () => {
                           y1={src.y}
                           x2={dst.x}
                           y2={dst.y}
-                          stroke="#334155"
-                          strokeWidth="1.5"
-                          strokeDasharray={edge.relation.includes('finding') ? '3 3' : 'none'}
+                          stroke={isHighlight ? '#38bdf8' : '#334155'}
+                          strokeWidth={isHighlight ? 2.2 : 1.5}
+                          strokeDasharray={
+                            edge.relation.includes('TRIGGERED') || edge.relation.includes('MATCHED')
+                              ? '4 3'
+                              : 'none'
+                          }
                           markerEnd="url(#arrow)"
                         />
                         <text
                           x={midX}
                           y={midY - 4}
-                          fill="#64748b"
+                          fill={isHighlight ? '#38bdf8' : '#64748b'}
                           fontSize="9"
                           textAnchor="middle"
                           fontFamily="monospace"
+                          fontWeight={isHighlight ? 'bold' : 'normal'}
                         >
                           {edge.relation}
                         </text>
@@ -272,7 +323,7 @@ export const AttackGraphPage: React.FC = () => {
                     const pos = coords[node.id];
                     if (!pos) return null;
                     const isSelected = selectedNode?.id === node.id;
-                    const isCentral = node.type === 'incident';
+                    const isCentral = node.type.toLowerCase() === 'incident';
                     const radius = isCentral ? 26 : 18;
                     const color = getNodeColor(node.type, node.severity);
 
@@ -334,22 +385,34 @@ export const AttackGraphPage: React.FC = () => {
           </div>
 
           {/* Graph Legend bottom-bar */}
-          <div className="pt-3 border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between text-[11px] text-slate-400">
-            <div className="flex items-center gap-4">
+          <div className="pt-3 border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-y-2">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" /> Incident Root
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" /> Incident
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 inline-block" /> Host Entity
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> Violation
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" /> User / Account
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" /> Customer
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" /> IP / Network
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> Process
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 inline-block" /> Session
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block" /> Device
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> Bank Account
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-pink-500 inline-block" /> Threat IOC
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-teal-500 inline-block" /> Response Action
               </span>
             </div>
             <div className="font-mono text-[10px] text-slate-500">
@@ -384,10 +447,10 @@ export const AttackGraphPage: React.FC = () => {
                   <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-cyan-500 to-rose-500"
-                      style={{ width: `${Math.min(100, selectedNode.risk_score * 10)}%` }}
+                      style={{ width: `${Math.min(100, (selectedNode.risk_score || 0) * 10)}%` }}
                     />
                   </div>
-                  <span className="font-mono text-slate-200 font-bold">{selectedNode.risk_score} / 10</span>
+                  <span className="font-mono text-slate-200 font-bold">{selectedNode.risk_score || 0} / 10</span>
                 </div>
               </div>
 
@@ -396,12 +459,49 @@ export const AttackGraphPage: React.FC = () => {
                 <span className="font-mono capitalize text-slate-300">{selectedNode.severity}</span>
               </div>
 
+              {/* Connected Relationships & Evidence */}
+              {connectedEdges.length > 0 && (
+                <div className="pt-2 border-t border-[var(--border-subtle)]">
+                  <span className="text-[10px] text-[var(--text-muted)] uppercase block mb-1.5">
+                    Correlated Graph Links & Evidence ({connectedEdges.length})
+                  </span>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {connectedEdges.map((edge, idx) => {
+                      const isOutgoing = edge.source === selectedNode.id;
+                      const otherNodeId = isOutgoing ? edge.target : edge.source;
+                      const otherNode = graphData?.nodes.find((n) => n.id === otherNodeId);
+                      return (
+                        <div key={idx} className="bg-[var(--bg-primary)] p-2.5 rounded border border-[var(--border-subtle)] text-[11px] space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-xs font-semibold text-cyan-400 flex items-center gap-1">
+                              {isOutgoing ? <ArrowRight className="w-3 h-3 text-cyan-400" /> : '← '}
+                              {edge.relation}
+                            </span>
+                            <span className="text-[9px] px-1 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
+                              {otherNode?.type || 'Node'}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-mono truncate">
+                            {isOutgoing ? `Target: ${otherNode?.label || otherNodeId}` : `Source: ${otherNode?.label || otherNodeId}`}
+                          </div>
+                          {edge.evidence && (
+                            <p className="text-[10px] text-slate-400 italic bg-black/20 p-1 rounded">
+                              "{edge.evidence}"
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {selectedNode.metadata && Object.keys(selectedNode.metadata).length > 0 && (
                 <div className="pt-2 border-t border-[var(--border-subtle)]">
                   <span className="text-[10px] text-[var(--text-muted)] uppercase block mb-1.5">
                     Topological Attributes
                   </span>
-                  <div className="bg-[var(--bg-primary)] p-3 rounded-lg border border-[var(--border-subtle)] space-y-1.5 font-mono text-[11px]">
+                  <div className="bg-[var(--bg-primary)] p-3 rounded-lg border border-[var(--border-subtle)] space-y-1.5 font-mono text-[11px] max-h-36 overflow-y-auto">
                     {Object.entries(selectedNode.metadata).map(([k, v]) => (
                       <div key={k} className="flex justify-between">
                         <span className="text-slate-500">{k}:</span>
@@ -411,19 +511,62 @@ export const AttackGraphPage: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              {/* Contextual Action Link based on selected node */}
+              <div className="pt-2 border-t border-[var(--border-subtle)] space-y-1.5">
+                {selectedNode.type.toLowerCase().includes('threat') && (
+                  <button
+                    onClick={() => onNavigateToTab?.('threat_intel', { indicatorValue: selectedNode.metadata?.value || selectedNode.label })}
+                    className="w-full py-1.5 rounded-lg bg-pink-950/60 hover:bg-pink-900 border border-pink-700/50 text-pink-300 text-[11px] font-sans font-bold flex items-center justify-center gap-1.5"
+                  >
+                    <span>Inspect in Threat Intelligence Workbench</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                )}
+                {selectedNode.type.toLowerCase().includes('action') && (
+                  <button
+                    onClick={() => onNavigateToTab?.('banking_monitor', { incidentId: selectedIncidentId, activeSubTab: 'orchestrator' })}
+                    className="w-full py-1.5 rounded-lg bg-teal-950/60 hover:bg-teal-900 border border-teal-700/50 text-teal-300 text-[11px] font-sans font-bold flex items-center justify-center gap-1.5"
+                  >
+                    <span>View Response Action Guardrail</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                )}
+                {selectedNode.type.toLowerCase().includes('incident') && (
+                  <button
+                    onClick={() => onNavigateToTab?.('banking_monitor', { incidentId: selectedIncidentId, activeSubTab: 'storyline' })}
+                    className="w-full py-1.5 rounded-lg bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-700/50 text-cyan-300 text-[11px] font-sans font-bold flex items-center justify-center gap-1.5"
+                  >
+                    <span>Open Correlated Attack Storyline</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                )}
+                {selectedNode.type.toLowerCase().includes('customer') && (
+                  <button
+                    onClick={() => onNavigateToTab?.('banking_monitor', { customerId: selectedNode.label })}
+                    className="w-full py-1.5 rounded-lg bg-purple-950/60 hover:bg-purple-900 border border-purple-700/50 text-purple-300 text-[11px] font-sans font-bold flex items-center justify-center gap-1.5"
+                  >
+                    <span>Filter Customer Behaviour Events</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <div className="py-12 text-center text-slate-500">
               <Info className="w-8 h-8 mx-auto mb-2 opacity-40 text-cyan-400" />
-              <p className="text-xs">Click any node on the graph canvas to inspect topological risk attributes.</p>
+              <p className="text-xs">Click any node on the graph canvas to inspect topological risk attributes and correlated evidence.</p>
             </div>
           )}
 
           {/* Academic Note */}
           <div className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-muted)] space-y-1">
-            <span className="font-semibold text-slate-300 block">Graph Reasoning Algorithm</span>
+            <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+              <ShieldAlert className="w-3.5 h-3.5 text-cyan-400" />
+              Graph Reasoning Algorithm
+            </span>
             <p>
-              Uses NetworkX path traversal to link related raw events, identifying lateral movement and privilege escalation clusters.
+              Uses NetworkX path traversal to link telemetry events, identifying multi-hop lateral movements, account takeovers, and threat intelligence matches.
             </p>
           </div>
         </div>

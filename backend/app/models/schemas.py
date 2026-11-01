@@ -148,13 +148,32 @@ class ResponseActionRequest(BaseModel):
 
 # Threat Intel Schemas
 class ThreatIndicatorCreate(BaseModel):
-    indicator_type: str  # ip, domain, hash
+    indicator_type: str = Field(..., pattern="^(ip|domain|hash|user_agent|device_fingerprint|restricted_beneficiary)$")
     value: str
     threat_type: str
     severity: SeverityLevel = SeverityLevel.HIGH
     confidence: float = 0.8
     source: str = "local_feed"
     description: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    metadata_info: Optional[Dict[str, Any]] = None
+
+class ThreatIndicatorResponse(BaseModel):
+    id: str
+    indicator_type: str
+    value: str
+    threat_type: str
+    severity: str
+    confidence: float
+    source: str
+    description: Optional[str] = None
+    is_active: bool
+    first_seen: Optional[datetime] = None
+    last_seen: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    metadata_info: Optional[Dict[str, Any]] = None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
 
 # ========================================================
 # BANKING SIMULATION & TRANSACTION GATEWAY SCHEMAS
@@ -246,3 +265,119 @@ class LedgerEntryResponse(BaseModel):
     description: Optional[str] = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+# ---------------------------------------------------------
+# Server-to-Server Internal Transaction Assessment Contract
+# ---------------------------------------------------------
+class TransactionAssessmentRequest(BaseModel):
+    transaction_id: str = Field(..., description="External or bank-assigned unique transfer ID")
+    customer_id: str = Field(..., description="Customer identifier in the banking platform")
+    source_account_id: str = Field(..., description="Source account identifier")
+    destination_account_number: str = Field(..., description="Target recipient account number")
+    amount_minor: int = Field(gt=0, description="Transaction amount in integer minor units (paise/cents)")
+    currency: str = Field(default="INR", pattern="^(INR|USD|EUR)$")
+    source_ip: Optional[str] = Field(default="127.0.0.1", description="Client IP address observed by banking tier")
+    user_agent: Optional[str] = Field(default="NexaBank-Web/1.0", description="Client user agent")
+    channel: str = Field(default="web", description="Transaction origin channel (web, mobile, api)")
+    idempotency_key: str = Field(..., min_length=8, max_length=64, description="Unique client-supplied idempotency key")
+
+class TransactionAssessmentResponse(BaseModel):
+    assessment_id: str
+    transaction_id: str
+    policy_decision: PolicyDecision
+    risk_score: float
+    risk_level: str
+    requires_verification: bool
+    reason_codes: List[str]
+    explanation: str
+    correlation_id: str
+    incident_id: Optional[str] = None
+    assessed_at: datetime = Field(default_factory=utc_now)
+
+# ---------------------------------------------------------
+# Security Violation & Telemetry Event Schema
+# ---------------------------------------------------------
+class SecurityViolationEventCreate(BaseModel):
+    event_type: str = Field(..., description="Canonical event name (e.g. TAB_SWITCH_BURST, FAILED_OTP_BURST, SQLI_DETECTED)")
+    category: str = Field(..., description="Category: browser_behaviour, authentication, transaction_fraud, beneficiary_manipulation, network_anomaly, application_security")
+    customer_id: Optional[str] = None
+    session_id: Optional[str] = None
+    transaction_id: Optional[str] = None
+    device_id: Optional[str] = None
+    source_application: str = Field(default="NexaBank-Web")
+    event_metadata: Dict[str, Any] = Field(default_factory=dict)
+    is_simulation: bool = Field(default=False)
+
+class SecurityViolationEventResponse(BaseModel):
+    id: str
+    event_id: str
+    event_type: str
+    category: str
+    severity: str
+    timestamp: datetime
+    customer_id: Optional[str] = None
+    session_id: Optional[str] = None
+    transaction_id: Optional[str] = None
+    source_ip: Optional[str] = None
+    device_id: Optional[str] = None
+    source_application: str
+    event_metadata: Dict[str, Any]
+    detection_rule: str
+    risk_contribution: float
+    correlation_id: str
+    incident_id: Optional[str] = None
+    is_simulation: bool
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+# ---------------------------------------------------------
+# Response Orchestration & Playbook Schemas
+# ---------------------------------------------------------
+class PlaybookActionResponse(BaseModel):
+    id: str
+    action_id: str
+    incident_id: str
+    playbook_id: str
+    action_type: str
+    target_entity: str
+    parameters: Dict[str, Any]
+    risk_level: str
+    requires_approval: bool
+    status: str
+    requested_by: str
+    approved_by: Optional[str] = None
+    rejected_by: Optional[str] = None
+    executed_by: Optional[str] = None
+    execution_result: Dict[str, Any] = Field(default_factory=dict)
+    error_details: Optional[str] = None
+    rollback_token: Optional[str] = None
+    is_simulation: bool
+    created_at: datetime
+    executed_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class PlaybookActionDecisionRequest(BaseModel):
+    decision: str = Field(..., pattern="^(APPROVE|REJECT|ROLLBACK)$")
+    analyst_notes: Optional[str] = None
+
+class BankingEnforcementRequest(BaseModel):
+    incident_id: str
+    action_id: str
+    action_type: str
+    target_entity: str
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+    approved_by: str
+    idempotency_key: str
+
+class BankingEnforcementResponse(BaseModel):
+    success: bool
+    status: str
+    action_id: str
+    action_type: str
+    target_entity: str
+    applied_changes: Dict[str, Any]
+    message: str
+    executed_at: datetime = Field(default_factory=utc_now)
+
+
+

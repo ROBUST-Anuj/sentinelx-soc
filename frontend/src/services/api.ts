@@ -3,7 +3,8 @@ import type { AxiosInstance } from 'axios';
 import type { 
   SOCStats, Incident, CanonicalEvent, DetectionFinding, 
   AttackGraphData, BenchmarkReport, ThreatIndicator, ResponseExecution,
-  BankAccount, Transfer, TransferCreatePayload, VerificationSubmitPayload
+  BankAccount, Transfer, TransferCreatePayload, VerificationSubmitPayload,
+  SecurityViolationEvent
 } from '../types/soc';
 
 export function getApiBaseUrl(): string {
@@ -99,6 +100,14 @@ class ApiService {
   }
 
   public async getAttackGraph(incidentId: string): Promise<AttackGraphData> {
+    try {
+      const res = await this.client.get(`/banking/intel/graph/incident/${incidentId}`);
+      if (res.data && res.data.nodes && res.data.nodes.length > 0) {
+        return res.data;
+      }
+    } catch {
+      // Fallback to legacy endpoint if unified graph is unavailable
+    }
     const res = await this.client.get(`/graph/incident/${incidentId}`);
     return res.data;
   }
@@ -165,6 +174,32 @@ class ApiService {
 
   public async getTransferDetail(id: string): Promise<Transfer> {
     const res = await this.client.get('/banking/transfers/' + id);
+    return res.data;
+  }
+
+  public async getSecurityViolations(params?: {
+    category?: string;
+    severity?: string;
+    is_simulation?: boolean;
+    limit?: number;
+  }): Promise<SecurityViolationEvent[]> {
+    const res = await this.client.get('/banking/security/violations', { params });
+    return res.data;
+  }
+
+  public async getUnifiedTimeline(params?: {
+    incident_id?: string;
+    customer_id?: string;
+    session_id?: string;
+    category?: string;
+    limit?: number;
+  }): Promise<any[]> {
+    const res = await this.client.get('/banking/command-center/timeline/unified', { params });
+    return res.data;
+  }
+
+  public async runFullDemonstration(): Promise<any> {
+    const res = await this.client.post('/banking/command-center/demo/run-full-lifecycle');
     return res.data;
   }
 }

@@ -72,40 +72,12 @@ async def get_me(current_user: User = Depends(get_current_user)):
 # ----------------- SOC OVERVIEW / HEALTH -----------------
 @api_router.get("/overview/stats")
 async def get_soc_stats(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    # Counts
-    events_res = await db.execute(select(Event))
-    events = events_res.scalars().all()
-    
-    from sqlalchemy.orm import selectinload
-    incidents_res = await db.execute(select(Incident).options(selectinload(Incident.findings)))
-    incidents = incidents_res.scalars().all()
-    
-    findings_res = await db.execute(select(DetectionFinding))
-    findings = findings_res.scalars().all()
-    
-    # Severity distribution
-    sev_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "informational": 0}
-    for inc in incidents:
-        sev = inc.severity.lower() if inc.severity else "medium"
-        sev_counts[sev] = sev_counts.get(sev, 0) + 1
-
-    return {
-        "total_events": len(events),
-        "total_findings": len(findings),
-        "total_incidents": len(incidents),
-        "active_sources": 4,
-        "severity_distribution": sev_counts,
-        "recent_incidents": [
-            {
-                "id": inc.id,
-                "title": inc.title,
-                "severity": inc.severity,
-                "status": inc.status,
-                "created_at": inc.created_at.isoformat(),
-                "findings_count": len(inc.findings) if inc.findings else 0
-            } for inc in incidents[:5]
-        ]
-    }
+    from app.banking.command_center_routes import get_command_center_stats
+    stats = await get_command_center_stats(db, current_user)
+    stats["total_events"] = stats.get("total_security_events", 0)
+    stats["total_findings"] = stats.get("violations_count", 0)
+    stats["recent_incidents"] = stats.get("recent_incident_activity", [])
+    return stats
 
 # ----------------- TELEMETRY INGESTION -----------------
 @api_router.post("/ingestion/upload")

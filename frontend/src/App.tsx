@@ -10,11 +10,21 @@ import { TelemetryPage } from './pages/TelemetryPage';
 import { ThreatIntelPage } from './pages/ThreatIntelPage';
 import { ResponseCenterPage } from './pages/ResponseCenterPage';
 import { BankingPage } from './pages/BankingPage';
+import { BankingMonitorPage } from './pages/BankingMonitorPage';
 import { api } from './services/api';
+import type { NavigationParams } from './types/soc';
 
 export default function App() {
   const [user, setUser] = useState<{ username: string; role: string } | null>(null);
   const [activeTab, setActiveTab] = useState<string>('overview');
+  const [navParams, setNavParams] = useState<NavigationParams>({});
+
+  const handleNavigate = (tab: string, params?: NavigationParams) => {
+    if (params) {
+      setNavParams(params);
+    }
+    setActiveTab(tab);
+  };
   const [collapsed, setCollapsed] = useState<boolean>(false);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -100,6 +110,11 @@ export default function App() {
           title: 'Enterprise Banking Gateway & Ledger Simulation',
           subtitle: 'Pre-transaction fraud risk evaluation, multi-tier policy enforcement, and atomic double-entry ledger posting',
         };
+      case 'banking_monitor':
+        return {
+          title: 'NexaBank Real-Time Behaviour & Security Monitoring Deck',
+          subtitle: 'Telemetry streams, browser visibility changes, account takeover prevention, and application security triage',
+        };
       default:
         return {
           title: 'SentinelX SOC',
@@ -137,15 +152,32 @@ export default function App() {
         <main className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
           <div key={refreshKey} className="max-w-7xl mx-auto space-y-6">
             {activeTab === 'overview' && (
-              <OverviewPage onNavigateToTab={(tab) => setActiveTab(tab)} />
+              <OverviewPage onNavigateToTab={handleNavigate} />
             )}
             {activeTab === 'incidents' && <IncidentsPage />}
-            {activeTab === 'graph' && <AttackGraphPage />}
+            {activeTab === 'graph' && (
+              <AttackGraphPage
+                initialIncidentId={navParams.incidentId}
+                onNavigateToTab={handleNavigate}
+              />
+            )}
             {activeTab === 'telemetry' && <TelemetryPage />}
             {activeTab === 'benchmark' && <DetectionLabPage />}
-            {activeTab === 'threat_intel' && <ThreatIntelPage />}
+            {activeTab === 'threat_intel' && (
+              <ThreatIntelPage
+                initialValue={navParams.indicatorValue}
+                onNavigateToTab={handleNavigate}
+              />
+            )}
             {activeTab === 'response' && <ResponseCenterPage />}
             {activeTab === 'banking' && <BankingPage />}
+            {activeTab === 'banking_monitor' && (
+              <BankingMonitorPage
+                initialIncidentId={navParams.incidentId}
+                initialCustomerId={navParams.customerId}
+                onNavigateToTab={handleNavigate}
+              />
+            )}
           </div>
         </main>
       </div>
