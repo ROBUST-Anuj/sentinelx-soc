@@ -25,7 +25,18 @@ class Settings(BaseSettings):
     
     # Environment & CORS
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
-    CORS_ORIGINS: Union[List[str], str] = os.getenv("CORS_ORIGINS", ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1:3000", "http://localhost:5174", "http://127.0.0.1:5174"])
+    CORS_ORIGINS: Union[List[str], str] = os.getenv("CORS_ORIGINS", [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "https://frontend-sigma-liart-89.vercel.app",
+        "https://nexabank-portal.vercel.app",
+        "https://nexabank-frontend.vercel.app",
+        "https://anuj1555-sentinelx-soc-demo.static.hf.space"
+    ])
 
     # Internal Service-to-Service Security
     INTERNAL_SERVICE_KEY: str = os.getenv("INTERNAL_SERVICE_KEY", "sentinelx-internal-banking-secret-key-2026")
