@@ -137,12 +137,22 @@ async def initiate_transfer(
     Evaluates fraud risk, enforces policy (ALLOW, VERIFY, HOLD, BLOCK), and executes atomic ledger posting.
     """
     client_ip = request.client.host if request.client else "127.0.0.1"
-    transfer = await transaction_gateway.initiate_transfer(
-        db=db,
-        req=req,
-        current_user_id=current_user.id,
-        client_ip=client_ip
-    )
+    try:
+        transfer = await transaction_gateway.initiate_transfer(
+            db=db,
+            req=req,
+            current_user_id=current_user.id,
+            client_ip=client_ip
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        import logging
+        logging.getLogger("sentinelx").exception(f"Error in initiate_transfer: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Transfer processing error: {str(exc)}"
+        )
 
     # Expose challenge code ONLY if running in non-production simulation/demo mode
     chal_stmt = select(VerificationChallenge).where(VerificationChallenge.transfer_id == transfer.id)

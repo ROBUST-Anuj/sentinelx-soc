@@ -420,33 +420,38 @@ class TransactionGateway:
         details: Dict[str, Any],
         ip_address: str | None = None
     ):
-        last_audit_res = await db.execute(
-            select(AuditLog).order_by(AuditLog.timestamp.desc()).limit(1).with_for_update()
-        )
-        last_audit = last_audit_res.scalars().first()
-        prev_hash = last_audit.entry_hash if last_audit else None
-        
-        audit_time = utc_now()
-        entry_hash = AuditLog.calculate_entry_hash(
-            prev_hash=prev_hash,
-            user_id=user_id,
-            action=action,
-            resource_type="banking_transfer",
-            resource_id=resource_id,
-            timestamp=audit_time
-        )
+        try:
+            last_audit_res = await db.execute(
+                select(AuditLog).order_by(AuditLog.timestamp.desc()).limit(1)
+            )
+            last_audit = last_audit_res.scalars().first()
+            prev_hash = last_audit.entry_hash if last_audit else None
+            
+            audit_time = utc_now()
+            entry_hash = AuditLog.calculate_entry_hash(
+                prev_hash=prev_hash,
+                user_id=user_id,
+                action=action,
+                resource_type="banking_transfer",
+                resource_id=resource_id,
+                timestamp=audit_time
+            )
 
-        entry = AuditLog(
-            user_id=user_id,
-            action=action,
-            resource_type="banking_transfer",
-            resource_id=resource_id,
-            details=details,
-            ip_address=ip_address,
-            prev_hash=prev_hash,
-            entry_hash=entry_hash,
-            timestamp=audit_time
-        )
-        db.add(entry)
+            entry = AuditLog(
+                user_id=user_id,
+                action=action,
+                resource_type="banking_transfer",
+                resource_id=resource_id,
+                details=details,
+                ip_address=ip_address,
+                prev_hash=prev_hash,
+                entry_hash=entry_hash,
+                timestamp=audit_time
+            )
+            db.add(entry)
+        except Exception as e:
+            # Audit log generation failure should not block transaction
+            import logging
+            logging.getLogger("sentinelx").warning(f"Audit log generation notice: {e}")
 
 transaction_gateway = TransactionGateway()

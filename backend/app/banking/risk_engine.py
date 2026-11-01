@@ -129,7 +129,15 @@ class FraudDetectionEngine:
             })
 
         # Rule 5: NEWLY CREATED ACCOUNT DRAINING (>80% of balance on fresh account)
-        account_age = now - source_account.created_at
+        if source_account.created_at:
+            src_created = source_account.created_at
+            if hasattr(src_created, "tzinfo") and src_created.tzinfo is not None:
+                now_cmp = datetime.now(timezone.utc)
+            else:
+                now_cmp = utc_now()
+            account_age = now_cmp - src_created
+        else:
+            account_age = timedelta(days=999)
         if account_age < timedelta(hours=24):
             drain_ratio = float(amount_minor) / float(max(source_account.balance_minor, 1))
             if drain_ratio >= 0.8:

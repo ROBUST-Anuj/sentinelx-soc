@@ -49,6 +49,7 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
     return user
 
 @api_router.post("/auth/login", response_model=Token)
+@api_router.post("/auth/token", response_model=Token)
 async def login(username: str = Form(...), password: str = Form(...), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.username == username))
     user = result.scalars().first()

@@ -24,7 +24,7 @@ export const api = {
     const formData = new URLSearchParams();
     formData.append('username', username);
     formData.append('password', password);
-    const resp = await apiClient.post('/api/auth/token', formData, {
+    const resp = await apiClient.post('/api/auth/login', formData, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
     return resp.data;
