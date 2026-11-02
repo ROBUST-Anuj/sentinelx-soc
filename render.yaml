@@ -18,6 +18,6 @@ services:
       - key: ANALYST_PASSWORD
         generateValue: true
       - key: CORS_ORIGINS
-        value: "https://frontend-sigma-liart-89.vercel.app,http://localhost:3000"
+        value: "https://frontend-sigma-liart-89.vercel.app,https://nexabank-portal.vercel.app,https://nexabank-frontend.vercel.app,http://localhost:3000,http://localhost:5173,http://localhost:5174"
       - key: DATABASE_URL
         sync: false

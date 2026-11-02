@@ -169,7 +169,19 @@ app = FastAPI(
 )
 
 # CORS configuration - strictly explicit environment-driven allowlist
-cors_origins = settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS]
+raw_origins = settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS]
+MANDATORY_ORIGINS = [
+    "https://frontend-sigma-liart-89.vercel.app",
+    "https://nexabank-portal.vercel.app",
+    "https://nexabank-frontend.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+]
+cors_origins = list(dict.fromkeys(raw_origins + MANDATORY_ORIGINS))
 allow_creds = ("*" not in cors_origins)
 
 cors_kwargs = {

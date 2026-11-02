@@ -29,7 +29,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         role: data.role
       });
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Invalid banking credentials. Please check your username and password.');
+      if (!err?.response) {
+        setError('Unable to connect to the banking server. Please check network or CORS connectivity.');
+      } else {
+        setError(err?.response?.data?.detail || 'Invalid banking credentials. Please check your username and password.');
+      }
     } finally {
       setLoading(false);
     }

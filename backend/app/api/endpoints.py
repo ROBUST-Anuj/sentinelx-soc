@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List, Dict, Any, Optional
@@ -50,10 +50,31 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
 
 @api_router.post("/auth/login", response_model=Token)
 @api_router.post("/auth/token", response_model=Token)
-async def login(username: str = Form(...), password: str = Form(...), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.username == username))
+async def login(
+    request: Request,
+    username: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db)
+):
+    actual_username = username
+    actual_password = password
+
+    # If form parameters are not present, check JSON body
+    if not actual_username or not actual_password:
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                actual_username = actual_username or body.get("username")
+                actual_password = actual_password or body.get("password")
+        except Exception:
+            pass
+
+    if not actual_username or not actual_password:
+        raise HTTPException(status_code=400, detail="Username and password are required")
+
+    result = await db.execute(select(User).where(User.username == actual_username))
     user = result.scalars().first()
-    if not user or not verify_password(password, user.hashed_password):
+    if not user or not verify_password(actual_password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect username or password")
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user account")

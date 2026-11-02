@@ -54,6 +54,35 @@ async def test_live_production_auth_analyst():
 
 
 @pytest.mark.asyncio
+async def test_live_production_cors_preflight_nexabank():
+    """Verify CORS preflight OPTIONS requests from NexaBank origin succeed with 200 OK."""
+    async with httpx.AsyncClient(timeout=CLIENT_TIMEOUT) as client:
+        headers = {
+            "Origin": "https://nexabank-portal.vercel.app",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        }
+        res = await client.options(f"{TARGET_API_URL}/api/auth/login", headers=headers)
+        assert res.status_code == 200
+        assert "access-control-allow-origin" in res.headers or "access-control-allow-credentials" in res.headers
+
+
+@pytest.mark.asyncio
+async def test_live_production_auth_json():
+    """Verify authentication succeeds when payload is transmitted as JSON."""
+    async with httpx.AsyncClient(timeout=CLIENT_TIMEOUT) as client:
+        res = await client.post(
+            f"{TARGET_API_URL}/api/auth/login",
+            json={"username": ADMIN_USERNAME, "password": ADMIN_PASSWORD},
+            headers={"Origin": "https://nexabank-portal.vercel.app"}
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert "access_token" in data
+        assert data.get("role") == "admin"
+
+
+@pytest.mark.asyncio
 async def test_live_production_account_retrieval():
     """Verify synthetic bank account retrieval for authenticated user."""
     async with httpx.AsyncClient(timeout=CLIENT_TIMEOUT) as client:
