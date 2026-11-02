@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Navbar } from './components/Navbar';
+import { Navbar, AppTab } from './components/Navbar';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { TransferPage } from './pages/TransferPage';
 import { TransactionsPage } from './pages/TransactionsPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { VerificationModal } from './components/VerificationModal';
 import { ReceiptModal } from './components/ReceiptModal';
 import { DemoLabModal } from './components/DemoLabModal';
@@ -14,15 +15,17 @@ import { telemetry } from './services/telemetry';
 export const App: React.FC = () => {
   const [session, setSession] = useState<UserSession | null>(null);
   
-  // Initialize tab based on browser pathname
-  const getInitialTab = (): 'dashboard' | 'transfer' | 'transactions' => {
+  // Resolve initial tab based on browser pathname
+  const getInitialTab = (): AppTab => {
     const path = window.location.pathname.replace(/^\/+/, '').toLowerCase();
     if (path === 'transfer') return 'transfer';
     if (path === 'transactions') return 'transactions';
+    if (path === 'accounts') return 'accounts';
+    if (path === 'profile') return 'profile';
     return 'dashboard';
   };
 
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'transfer' | 'transactions'>(getInitialTab);
+  const [currentTab, setCurrentTab] = useState<AppTab>(getInitialTab);
 
   // Modal states
   const [activeReceipt, setActiveReceipt] = useState<TransferResult | null>(null);
@@ -44,8 +47,8 @@ export const App: React.FC = () => {
 
     const handlePopState = () => {
       const path = window.location.pathname.replace(/^\/+/, '').toLowerCase();
-      if (path === 'transfer' || path === 'transactions' || path === 'dashboard') {
-        setCurrentTab(path);
+      if (path === 'transfer' || path === 'transactions' || path === 'accounts' || path === 'profile' || path === 'dashboard') {
+        setCurrentTab(path as AppTab);
       } else {
         setCurrentTab('dashboard');
       }
@@ -55,7 +58,7 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const handleTabChange = (tab: 'dashboard' | 'transfer' | 'transactions') => {
+  const handleTabChange = (tab: AppTab) => {
     setCurrentTab(tab);
     if (window.location.pathname !== `/${tab}`) {
       window.history.pushState(null, '', `/${tab}`);
@@ -72,7 +75,9 @@ export const App: React.FC = () => {
 
   const handleLoginSuccess = (userSession: UserSession) => {
     setSession(userSession);
-    window.history.pushState(null, '', `/${currentTab}`);
+    const initial = getInitialTab();
+    window.history.pushState(null, '', `/${initial}`);
+    setCurrentTab(initial);
   };
 
   const handleTransferComplete = (res: TransferResult) => {
@@ -105,7 +110,7 @@ export const App: React.FC = () => {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {currentTab === 'dashboard' && (
+        {(currentTab === 'dashboard' || currentTab === 'accounts') && (
           <DashboardPage
             onNavigateTransfer={() => handleTabChange('transfer')}
             onNavigateTransactions={() => handleTabChange('transactions')}
@@ -122,6 +127,14 @@ export const App: React.FC = () => {
         {currentTab === 'transactions' && (
           <TransactionsPage
             onSelectReceipt={(tx) => setActiveReceipt(tx)}
+          />
+        )}
+
+        {currentTab === 'profile' && (
+          <ProfilePage
+            session={session}
+            onNavigateTab={handleTabChange}
+            onOpenDemoLab={() => setDemoLabOpen(true)}
           />
         )}
       </main>

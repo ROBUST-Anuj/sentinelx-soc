@@ -1,9 +1,11 @@
 import React from 'react';
 import { ShieldCheck, LogOut, CreditCard, ArrowLeftRight, History, User } from 'lucide-react';
 
+export type AppTab = 'dashboard' | 'accounts' | 'transfer' | 'transactions' | 'profile';
+
 interface NavbarProps {
-  currentTab: 'dashboard' | 'transfer' | 'transactions';
-  setCurrentTab: (tab: 'dashboard' | 'transfer' | 'transactions') => void;
+  currentTab: AppTab;
+  setCurrentTab: (tab: AppTab) => void;
   username: string;
   onLogout: () => void;
   onOpenDemoLab: () => void;
@@ -28,9 +30,9 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, usern
           {/* Navigation Links */}
           <nav className="hidden md:flex space-x-1">
             <button
-              onClick={() => setCurrentTab('dashboard')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                currentTab === 'dashboard'
+              onClick={() => setCurrentTab('accounts')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                currentTab === 'dashboard' || currentTab === 'accounts'
                   ? 'bg-slate-800 text-teal-400 shadow-inner'
                   : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
               }`}
@@ -41,7 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, usern
 
             <button
               onClick={() => setCurrentTab('transfer')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                 currentTab === 'transfer'
                   ? 'bg-slate-800 text-teal-400 shadow-inner'
                   : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
@@ -53,7 +55,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, usern
 
             <button
               onClick={() => setCurrentTab('transactions')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                 currentTab === 'transactions'
                   ? 'bg-slate-800 text-teal-400 shadow-inner'
                   : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
@@ -75,17 +77,25 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, usern
               <span>Security Demo Lab</span>
             </button>
 
-            <div className="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700/60">
+            <button
+              onClick={() => setCurrentTab('profile')}
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
+                currentTab === 'profile'
+                  ? 'bg-teal-500/20 border-teal-400 text-teal-300 shadow-sm'
+                  : 'bg-slate-800/80 border-slate-700/60 text-slate-200 hover:border-slate-500'
+              }`}
+              title="View Profile & Settings"
+            >
               <div className="h-6 w-6 rounded-full bg-teal-500/20 text-teal-300 flex items-center justify-center">
                 <User className="h-3.5 w-3.5" />
               </div>
-              <span className="text-xs font-semibold text-slate-200 capitalize">{username}</span>
-            </div>
+              <span className="text-xs font-semibold capitalize">{username}</span>
+            </button>
 
             <button
               onClick={onLogout}
               title="Sign Out"
-              className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors"
+              className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
             >
               <LogOut className="h-5 w-5" />
             </button>
