@@ -72,7 +72,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
 
 # ----------------- SOC OVERVIEW / HEALTH -----------------
 @api_router.get("/overview/stats")
-async def get_soc_stats(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def get_soc_stats(db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.ANALYST, UserRole.READONLY]))):
     from app.banking.command_center_routes import get_command_center_stats
     stats = await get_command_center_stats(db, current_user)
     stats["total_events"] = stats.get("total_security_events", 0)
@@ -208,7 +208,7 @@ async def get_events(
 @api_router.get("/incidents")
 async def get_incidents(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.ANALYST, UserRole.READONLY]))
 ):
     from sqlalchemy.orm import selectinload
     res = await db.execute(select(Incident).options(selectinload(Incident.findings)).order_by(Incident.created_at.desc()))
@@ -236,7 +236,7 @@ async def get_incidents(
 async def get_incident_detail(
     incident_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.ANALYST, UserRole.READONLY]))
 ):
     res = await db.execute(select(Incident).where(Incident.id == incident_id))
     inc = res.scalars().first()
@@ -406,7 +406,7 @@ async def get_response_history(
 # ----------------- THREAT INTEL -----------------
 @api_router.get("/threat-intel")
 async def get_threat_indicators(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.ANALYST, UserRole.READONLY]))
 ):
     return list(threat_intel.ioc_database.values())
 
@@ -422,7 +422,7 @@ async def add_threat_indicator(
 @api_router.post("/evaluation/run-benchmark")
 async def run_evaluation(
     n_events: int = 1000,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.ANALYST]))
 ):
     """Executes live reproducible benchmark across Rule, ML, and Hybrid+Graph models"""
     results = evaluation_harness.run_eval_pipeline(n_events=n_events)

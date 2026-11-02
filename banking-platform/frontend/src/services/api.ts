@@ -1,7 +1,16 @@
 import axios from 'axios';
 import { BankAccount, TransferResult, LedgerEntry } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://sentinelx-api-316t.onrender.com';
+function getApiBaseUrl(): string {
+  let url = (import.meta.env.VITE_API_BASE_URL || 'https://sentinelx-api-316t.onrender.com').trim();
+  url = url.replace(/\/+$/, '');
+  if (url.endsWith('/api')) {
+    url = url.substring(0, url.length - 4);
+  }
+  return url;
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,

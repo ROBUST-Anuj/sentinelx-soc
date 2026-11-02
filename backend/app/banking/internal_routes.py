@@ -29,26 +29,133 @@ internal_router = APIRouter(prefix="/internal/v1", tags=["Internal Security Serv
 def utc_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
+import hashlib
+import time
+from typing import Tuple, Dict, Optional
+from fastapi import Request
+
+# Replay cache for nonces within the valid timestamp drift window: (nonce -> expiry_timestamp)
+_NONCE_CACHE: Dict[str, float] = {}
+
+def generate_hmac_signature(
+    secret_key: str,
+    method: str,
+    path: str,
+    timestamp: str,
+    nonce: str,
+    body: bytes
+) -> str:
+    """
+    Calculates SHA-256 HMAC signature covering:
+    HTTP Method, Request Path, Timestamp, Nonce, and Body SHA-256 Digest.
+    """
+    body_hash = hashlib.sha256(body).hexdigest()
+    canonical_payload = f"{method.upper()}\n{path}\n{timestamp}\n{nonce}\n{body_hash}".encode("utf-8")
+    return hmac.new(secret_key.encode("utf-8"), canonical_payload, hashlib.sha256).hexdigest()
+
+def verify_hmac_signature(
+    secret_key: str,
+    method: str,
+    path: str,
+    timestamp: str,
+    nonce: str,
+    body: bytes,
+    signature: str,
+    max_drift_seconds: int = 300
+) -> Tuple[bool, str]:
+    """
+    Cryptographic HMAC signature verification:
+    1. Validates timestamp drift within max_drift_seconds (default: 300s / 5 mins).
+    2. Enforces nonce replay prevention with automatic expiration pruning.
+    3. Performs constant-time comparison against expected HMAC-SHA256 signature.
+    """
+    # 1. Timestamp drift check
+    try:
+        req_time = float(timestamp)
+    except (ValueError, TypeError):
+        return False, "Invalid timestamp format."
+
+    current_time = time.time()
+    if abs(current_time - req_time) > max_drift_seconds:
+        return False, "Request timestamp exceeds allowable drift window."
+
+    # 2. Nonce replay prevention
+    now = time.time()
+    # Prune expired nonces
+    expired = [k for k, exp in _NONCE_CACHE.items() if exp < now]
+    for k in expired:
+        _NONCE_CACHE.pop(k, None)
+
+    if nonce in _NONCE_CACHE:
+        return False, "Nonce replay detected."
+
+    _NONCE_CACHE[nonce] = req_time + max_drift_seconds
+
+    # 3. Constant-time signature comparison
+    expected_sig = generate_hmac_signature(
+        secret_key=secret_key,
+        method=method,
+        path=path,
+        timestamp=timestamp,
+        nonce=nonce,
+        body=body
+    )
+    if not hmac.compare_digest(expected_sig, signature):
+        return False, "HMAC signature mismatch (tampering or invalid secret)."
+
+    return True, "Valid signature."
+
 async def verify_internal_service_auth(
-    x_service_auth: str = Header(None, alias="X-Service-Auth")
+    request: Request,
+    x_service_auth: Optional[str] = Header(None, alias="X-Service-Auth"),
+    x_signature: Optional[str] = Header(None, alias="X-Signature"),
+    x_timestamp: Optional[str] = Header(None, alias="X-Timestamp"),
+    x_nonce: Optional[str] = Header(None, alias="X-Nonce")
 ):
     """
-    Constant-time authentication for server-to-server inter-service calls.
-    Requires header: X-Service-Auth: <INTERNAL_SERVICE_KEY>
+    Authenticates inter-service server-to-server calls.
+    Supports:
+    1. Full Cryptographic HMAC Signature: X-Signature, X-Timestamp, X-Nonce covering method, path, and body.
+    2. Token-Based Service Key: X-Service-Auth (constant-time compared against INTERNAL_SERVICE_KEY).
     """
-    if not x_service_auth:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing required X-Service-Auth header for internal service API."
+    # Mode 1: Cryptographic Request Signing
+    if x_signature:
+        if not x_timestamp or not x_nonce:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Missing required X-Timestamp or X-Nonce for HMAC request signature."
+            )
+        body = await request.body()
+        is_valid, reason = verify_hmac_signature(
+            secret_key=settings.INTERNAL_SERVICE_KEY,
+            method=request.method,
+            path=request.url.path,
+            timestamp=x_timestamp,
+            nonce=x_nonce,
+            body=body,
+            signature=x_signature
         )
-    
-    expected_token = settings.INTERNAL_SERVICE_KEY
-    if not hmac.compare_digest(x_service_auth, expected_token):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid internal service credentials."
-        )
-    return True
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=reason
+            )
+        return True
+
+    # Mode 2: Static Token Header (Backward-compatible inter-service token)
+    if x_service_auth:
+        expected_token = settings.INTERNAL_SERVICE_KEY
+        if not hmac.compare_digest(x_service_auth, expected_token):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid internal service credentials."
+            )
+        return True
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Missing required internal service authentication (X-Signature or X-Service-Auth)."
+    )
 
 @internal_router.post(
     "/transaction-assessments",

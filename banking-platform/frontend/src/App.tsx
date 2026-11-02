@@ -13,7 +13,16 @@ import { telemetry } from './services/telemetry';
 
 export const App: React.FC = () => {
   const [session, setSession] = useState<UserSession | null>(null);
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'transfer' | 'transactions'>('dashboard');
+  
+  // Initialize tab based on browser pathname
+  const getInitialTab = (): 'dashboard' | 'transfer' | 'transactions' => {
+    const path = window.location.pathname.replace(/^\/+/, '').toLowerCase();
+    if (path === 'transfer') return 'transfer';
+    if (path === 'transactions') return 'transactions';
+    return 'dashboard';
+  };
+
+  const [currentTab, setCurrentTab] = useState<'dashboard' | 'transfer' | 'transactions'>(getInitialTab);
 
   // Modal states
   const [activeReceipt, setActiveReceipt] = useState<TransferResult | null>(null);
@@ -32,13 +41,38 @@ export const App: React.FC = () => {
         role: role || 'customer',
       });
     }
+
+    const handlePopState = () => {
+      const path = window.location.pathname.replace(/^\/+/, '').toLowerCase();
+      if (path === 'transfer' || path === 'transactions' || path === 'dashboard') {
+        setCurrentTab(path);
+      } else {
+        setCurrentTab('dashboard');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  const handleTabChange = (tab: 'dashboard' | 'transfer' | 'transactions') => {
+    setCurrentTab(tab);
+    if (window.location.pathname !== `/${tab}`) {
+      window.history.pushState(null, '', `/${tab}`);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('nexabank_token');
     localStorage.removeItem('nexabank_user');
     localStorage.removeItem('nexabank_role');
     setSession(null);
+    window.history.pushState(null, '', '/login');
+  };
+
+  const handleLoginSuccess = (userSession: UserSession) => {
+    setSession(userSession);
+    window.history.pushState(null, '', `/${currentTab}`);
   };
 
   const handleTransferComplete = (res: TransferResult) => {
@@ -57,14 +91,14 @@ export const App: React.FC = () => {
   };
 
   if (!session) {
-    return <LoginPage onLoginSuccess={setSession} />;
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
       <Navbar
         currentTab={currentTab}
-        setCurrentTab={setCurrentTab}
+        setCurrentTab={handleTabChange}
         username={session.username}
         onLogout={handleLogout}
         onOpenDemoLab={() => setDemoLabOpen(true)}
@@ -73,8 +107,8 @@ export const App: React.FC = () => {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {currentTab === 'dashboard' && (
           <DashboardPage
-            onNavigateTransfer={() => setCurrentTab('transfer')}
-            onNavigateTransactions={() => setCurrentTab('transactions')}
+            onNavigateTransfer={() => handleTabChange('transfer')}
+            onNavigateTransactions={() => handleTabChange('transactions')}
           />
         )}
 
@@ -106,7 +140,7 @@ export const App: React.FC = () => {
         transfer={activeReceipt}
         onClose={() => {
           setActiveReceipt(null);
-          setCurrentTab('dashboard');
+          handleTabChange('dashboard');
         }}
       />
 

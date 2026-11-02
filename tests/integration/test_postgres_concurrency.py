@@ -11,14 +11,13 @@ from app.models.db_models import Base, User, BankAccount, Transfer, LedgerEntry
 from app.models.schemas import TransferCreateRequest, TransferStatus
 from app.banking.gateway import transaction_gateway
 
-PG_TEST_URL = os.getenv(
-    "TEST_POSTGRES_URL",
-    "postgresql+asyncpg://postgres:SecureDbPass2026!@db.qolljpkbvsxhqszevweu.supabase.co:5432/postgres"
-)
+PG_TEST_URL = os.getenv("TEST_POSTGRES_URL", "")
 
 @pytest_asyncio.fixture
 async def pg_db_session():
     """Connect to live PostgreSQL, create tables if missing, seed test accounts, and clean up."""
+    if not PG_TEST_URL:
+        pytest.skip("TEST_POSTGRES_URL environment variable is not configured; skipping live PostgreSQL concurrency test.")
     try:
         engine = create_async_engine(PG_TEST_URL, echo=False)
     except Exception as e:

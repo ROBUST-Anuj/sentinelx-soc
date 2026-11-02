@@ -28,27 +28,46 @@ async def lifespan(app: FastAPI):
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         
-        # Non-destructive schema migration for PostgreSQL:
-        # Adds missing columns to existing tables without affecting existing data
+        # Versioned, non-destructive schema migration tracking:
         from sqlalchemy import text
-        migration_statements = [
-            "ALTER TABLE threat_indicators ADD COLUMN IF NOT EXISTS first_seen TIMESTAMP DEFAULT NOW();",
-            "ALTER TABLE threat_indicators ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP DEFAULT NOW();",
-            "ALTER TABLE threat_indicators ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;",
-            "ALTER TABLE threat_indicators ADD COLUMN IF NOT EXISTS metadata_info JSON DEFAULT '{}';",
-            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS prev_hash VARCHAR;",
-            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entry_hash VARCHAR DEFAULT 'GENESIS';",
-            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS resource_type VARCHAR DEFAULT 'system';",
-            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS resource_id VARCHAR;",
-            "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS affected_entities JSON DEFAULT '[]';",
-            "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS threat_intel_matches JSON DEFAULT '[]';",
-            "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS graph_risk_score FLOAT DEFAULT 0.0;"
+        try:
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version VARCHAR(64) PRIMARY KEY,
+                    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    description VARCHAR(255)
+                );
+            """))
+            applied_res = await conn.execute(text("SELECT version FROM schema_migrations;"))
+            applied_versions = {row[0] for row in applied_res.fetchall()}
+        except Exception as e:
+            logger.debug(f"schema_migrations table init notice: {e}")
+            applied_versions = set()
+
+        migration_registry = [
+            ("20260401_threat_intel_first_seen", "ALTER TABLE threat_indicators ADD COLUMN IF NOT EXISTS first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP;"),
+            ("20260401_threat_intel_last_seen", "ALTER TABLE threat_indicators ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP;"),
+            ("20260401_threat_intel_expires_at", "ALTER TABLE threat_indicators ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;"),
+            ("20260401_threat_intel_metadata", "ALTER TABLE threat_indicators ADD COLUMN IF NOT EXISTS metadata_info JSON DEFAULT '{}';"),
+            ("20260402_audit_prev_hash", "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS prev_hash VARCHAR;"),
+            ("20260402_audit_entry_hash", "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entry_hash VARCHAR DEFAULT 'GENESIS';"),
+            ("20260402_audit_resource_type", "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS resource_type VARCHAR DEFAULT 'system';"),
+            ("20260402_audit_resource_id", "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS resource_id VARCHAR;"),
+            ("20260403_incidents_entities", "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS affected_entities JSON DEFAULT '[]';"),
+            ("20260403_incidents_intel_matches", "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS threat_intel_matches JSON DEFAULT '[]';"),
+            ("20260403_incidents_graph_score", "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS graph_risk_score FLOAT DEFAULT 0.0;")
         ]
-        for stmt in migration_statements:
-            try:
-                await conn.execute(text(stmt))
-            except Exception as e:
-                logger.debug(f"Schema migration statement notice: {e}")
+
+        for version, stmt in migration_registry:
+            if version not in applied_versions:
+                try:
+                    await conn.execute(text(stmt))
+                    try:
+                        await conn.execute(text("INSERT INTO schema_migrations (version, description) VALUES (:v, :d)"), {"v": version, "d": stmt[:250]})
+                    except Exception:
+                        pass
+                except Exception as e:
+                    logger.debug(f"Schema migration statement notice ({version}): {e}")
         
     async with AsyncSessionLocal() as session:
         # Check if default admin exists
@@ -149,17 +168,22 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS configuration
-cors_origins = settings.CORS_ORIGINS if settings.ENVIRONMENT == "production" else ["*"]
-allow_creds = True if settings.ENVIRONMENT != "production" or "*" not in cors_origins else False
+# CORS configuration - strictly explicit environment-driven allowlist
+cors_origins = settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS]
+allow_creds = ("*" not in cors_origins)
+
+cors_kwargs = {
+    "allow_origins": cors_origins,
+    "allow_credentials": allow_creds,
+    "allow_methods": ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    "allow_headers": ["*"],
+}
+if settings.CORS_ORIGIN_REGEX:
+    cors_kwargs["allow_origin_regex"] = settings.CORS_ORIGIN_REGEX
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_origin_regex=r"https://.*\.vercel\.app",
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    **cors_kwargs
 )
 
 # Include Routers
